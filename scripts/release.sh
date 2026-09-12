@@ -20,8 +20,8 @@ test ! -e "$release_dir" || { echo "Release directory already exists: $release_d
 sh scripts/build-engines.sh
 CGO_ENABLED=1 WIRECTL_TEST_ARIA2="$release_root/.cache/engines/aria2-prefix/bin/aria2c" make check TEST_FLAGS=-count=1
 mkdir -p "$release_dir/bin" "$release_dir/deploy" "$release_dir/licenses"
-go build -trimpath -ldflags="-s -w -X main.version=$release_version" -o "$release_dir/bin/wirectl-download" ./cmd/wirectl-download
-go build -trimpath -ldflags="-s -w -X main.version=$release_version" -o "$release_dir/bin/wirectl" ./cmd/wirectl
+go build -buildvcs=false -trimpath -ldflags="-s -w -X main.version=$release_version" -o "$release_dir/bin/wirectl-download" ./cmd/wirectl-download
+go build -buildvcs=false -trimpath -ldflags="-s -w -X main.version=$release_version" -o "$release_dir/bin/wirectl" ./cmd/wirectl
 python3 scripts/bundle-engines.py "$release_dir/libexec/wirectl-download"
 cp README.md "$release_dir/README.md"
 cp scripts/install.sh "$release_dir/install.sh"

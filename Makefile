@@ -8,8 +8,8 @@ export TMPDIR := $(ROOT)/.cache/tmp
 .PHONY: build test check release
 build:
 	@mkdir -p .cache/tmp bin
-	go build -trimpath -ldflags='-s -w' -o bin/wirectl-download ./cmd/wirectl-download
-	go build -trimpath -ldflags='-s -w' -o bin/wirectl ./cmd/wirectl
+	go build -buildvcs=false -trimpath -ldflags='-s -w' -o bin/wirectl-download ./cmd/wirectl-download
+	go build -buildvcs=false -trimpath -ldflags='-s -w' -o bin/wirectl ./cmd/wirectl
 test:
 	@mkdir -p .cache/tmp
 	go test -race $(TEST_FLAGS) ./...

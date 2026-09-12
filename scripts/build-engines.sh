@@ -100,7 +100,7 @@ if ! test -x .cache/engines/aria2-prefix/bin/aria2c; then
   mkdir -p .cache/engines/aria2-build
   (cd .cache/engines/aria2-build
     if test "$engine_os" = Darwin; then engine_tls=--without-openssl; else engine_tls=--with-openssl; fi
-    ../aria2-1.37.0/configure --prefix="$engine_root/.cache/engines/aria2-prefix" "$engine_tls" --without-gnutls --without-libssh2 --without-libxml2 --without-sqlite3 --without-libcares --disable-nls --disable-shared > configure.log 2>&1
+    ../aria2-1.37.0/configure --prefix="$engine_root/.cache/engines/aria2-prefix" "$engine_tls" --without-gnutls --without-libgmp --without-libnettle --without-libgcrypt --without-libssh2 --without-libxml2 --without-sqlite3 --without-libcares --disable-nls --disable-shared > configure.log 2>&1
     make -j"$engine_jobs" > make.log 2>&1
     make install > install.log 2>&1)
 fi
