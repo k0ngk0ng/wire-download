@@ -50,7 +50,7 @@ func Init(dir, downloads string) (Config, error) {
 	}
 	c := Config{Version: 1, Downloads: absolute, Aria2Binary: "aria2c", AMuledBinary: "amuled", AMulecmdBinary: "amulecmd", Aria2Port: 16800, AMulePort: 14712, BTPort: 16881, ED2KPort: 14662, KadPort: 14672, Secret: hex.EncodeToString(b), MaxDownloads: 5, DownloadLimit: "0", UploadLimit: "1M", SeedRatio: 1.0,
 		Trackers:       []string{"udp://tracker.opentrackr.org:1337/announce", "udp://open.stealth.si:80/announce", "udp://tracker.torrent.eu.org:451/announce", "https://tracker.tamersunion.org:443/announce"},
-		ServerListURLs: []string{"https://upd.emule-security.org/server.met", "https://www.gruk.org/server.met"}}
+		ServerListURLs: []string{"https://upd.emule-security.org/server.met", "https://www.gruk.org/server.met", "https://emule.shortypower.org/server.met"}}
 	c.AuthProxyPort = 16802
 	if err = c.Validate(); err != nil {
 		return Config{}, err

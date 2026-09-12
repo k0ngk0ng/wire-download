@@ -12,6 +12,7 @@ import argparse
 import base64
 import hashlib
 import http.server
+from xml.sax.saxutils import escape
 import json
 import os
 from pathlib import Path
@@ -39,7 +40,10 @@ parser.add_argument(
     choices=("torrent", "http-torrent", "magnet", "http-torrent-auth"),
     help="run only the selected profile (repeat for multiple profiles)",
 )
+parser.add_argument("--search", action="store_true", help="discover the torrent/magnet through two local RSS indexes before downloading")
 args = parser.parse_args()
+if args.search and (not args.only or any(x not in ("http-torrent", "magnet") for x in args.only)):
+    parser.error("--search requires --only http-torrent and/or --only magnet")
 
 root = Path(__file__).resolve().parent.parent
 prefix = args.prefix.resolve()
@@ -180,6 +184,19 @@ class FixtureServer:
 
     def serve(self, handler, body):
         path = urlsplit(handler.path).path
+        if path in {"/rss-one", "/rss-two", "/rss-offline"}:
+            self.requests.append({"path": handler.path, "private": False, "authorized": False})
+            if path == "/rss-offline":
+                handler.send_error(503)
+                return
+            data = self.feed.encode()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/rss+xml")
+            handler.send_header("Content-Length", str(len(data)))
+            handler.end_headers()
+            if body:
+                handler.wfile.write(data)
+            return
         if path not in {"/fixture.torrent", "/private-fixture.torrent"}:
             handler.send_error(404)
             return
@@ -511,7 +528,24 @@ def run_profile(profile, source, payload, fixture_name, timeout):
     profile.record["source"] = source
     start_daemon(profile)
     try:
-        output = cli(profile, "add", "--detach", source)
+        if args.search:
+            query_type = "magnet" if profile.name == "magnet" else "torrent"
+            snapshot = json.loads(cli(profile, "search", "--type", query_type, "--json", "--timeout", "15s", "owned fixture"))
+            (profile.evidence_dir / "search.json").write_text(json.dumps(snapshot, indent=2))
+            if snapshot["status"] != "partial" or len(snapshot["results"]) != 1:
+                raise RuntimeError(f"search did not merge partial results: {snapshot!r}")
+            result = snapshot["results"][0]
+            if result.get("info_hash") != info_hash or result.get("size") != len(payload):
+                raise RuntimeError(f"search changed hash/size: {result!r}")
+            if sorted(result["sources"]) != ["one", "two"] or result["kind"] != query_type:
+                raise RuntimeError(f"wrong merged sources or kind: {result!r}")
+            if list_status(profile)["jobs"]:
+                raise RuntimeError("search automatically downloaded a result")
+            output = cli(profile, "search", "download", snapshot["id"], result["id"])
+            profile.record["steps"].append("multi-source search merges hashes and preserves partial results; explicit result download")
+            print("PASS", profile.name, "search result selected for download", flush=True)
+        else:
+            output = cli(profile, "add", "--detach", source)
         match = re.search(r"(?m)^([0-9a-f]{12})\s+aria2\s+", output)
         if not match:
             raise RuntimeError(f"could not parse logical job ID from add output: {output!r}")
@@ -740,6 +774,12 @@ try:
             + quote(tracker_url, safe="")
         ),
     }
+    file_server.feed = ('<?xml version="1.0"?><rss version="2.0" xmlns:nyaa="https://nyaa.si/xmlns/nyaa"><channel>'
+                        '<title>Owned fixture index</title><item><title>' + fixture_name + '</title><link>' + escape(file_server.url) + '</link>'
+                        '<description><![CDATA[<a href="' + escape(sources["magnet"]) + '">Magnet</a>]]></description>'
+                        '<enclosure type="application/x-bittorrent" url="' + escape(file_server.url) + '"/>'
+                        '<nyaa:infoHash>' + info_hash + '</nyaa:infoHash><nyaa:seeders>1</nyaa:seeders>'
+                        '<nyaa:size>4 MiB</nyaa:size></item></channel></rss>')
     evidence["torrent"] = {
         "name": fixture_name,
         "bytes": len(payload),
@@ -785,6 +825,13 @@ try:
         profile.state.parent.mkdir(parents=True, exist_ok=True)
         profile.downloads.mkdir(parents=True)
         prepare_profile(profile, tracker_url, ports)
+        if args.search:
+            search_sources = [{"id": source_id, "name": "Owned " + source_id, "type": "rss",
+                               "url": file_server.origin + "/rss-" + source_id + "?q={query}", "enabled": True}
+                              for source_id in ("one", "two", "offline")]
+            source_path = profile.state / "search-sources.json"
+            source_path.write_text(json.dumps(search_sources))
+            source_path.chmod(0o600)
         profile.record["ports"] = ports
         profiles.append(profile)
         if name == "http-torrent-auth":

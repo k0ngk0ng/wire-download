@@ -52,6 +52,12 @@ type AMule struct {
 	mu       sync.RWMutex
 	closed   bool
 	executor amuleCommandExecutor
+	// searchGate serializes native EC searches for one core. aMule exposes
+	// only one current search/result context (0xffffffff), so overlapping
+	// searches would overwrite each other's results. It is deliberately
+	// independent from mu: ordinary queue operations remain available while a
+	// search is running.
+	searchGate chan struct{}
 }
 
 // NewAMule creates an External Connections adapter.  The optional port keeps
@@ -67,12 +73,13 @@ func NewAMule(binary, configDir, password string, ports ...int) *AMule {
 		binary = "amulecmd"
 	}
 	return &AMule{
-		binary:    binary,
-		configDir: configDir,
-		password:  password,
-		host:      "127.0.0.1",
-		port:      port,
-		executor:  defaultAMuleCommandExecutor,
+		binary:     binary,
+		configDir:  configDir,
+		password:   password,
+		host:       "127.0.0.1",
+		port:       port,
+		executor:   defaultAMuleCommandExecutor,
+		searchGate: make(chan struct{}, 1),
 	}
 }
 

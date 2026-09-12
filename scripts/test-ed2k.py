@@ -25,6 +25,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('prefix', type=Path)
 parser.add_argument('--address', required=True)
 parser.add_argument('--timeout', type=int, default=180)
+parser.add_argument('--search', action='store_true', help='discover the fixture through the local eD2k server')
 args = parser.parse_args()
 address = ipaddress.IPv4Address(args.address)
 if address.is_loopback or address.is_unspecified or address.is_multicast:
@@ -39,7 +40,7 @@ base_env = {**os.environ, 'PATH': '/usr/bin:/bin', 'TMPDIR': str(work)}
 configs = {}
 started = []
 ports = set()
-evidence = {'passed': False, 'address': str(address), 'steps': []}
+evidence = {'passed': False, 'address': str(address), 'work': str(work), 'steps': []}
 
 
 def cli(profile, *command):
@@ -120,9 +121,47 @@ try:
 
     digest = wait_for(shared_hash, 'seed hashes and shares complete fixture', 30)
     wait_for(lambda: len(server.client_ids) >= 2, 'both engines log into local ED2K server', 20)
-    link = (f'ed2k://|file|{filename}|{len(payload)}|{digest}|/'
-            f'|sources,{address}:{configs["seed"]["ed2k_port"]}|/')
-    cli('download', 'add', '--detach', link)
+    server.configure_search(bytes.fromhex(digest), filename, len(payload),
+                            str(address), configs['seed']['ed2k_port'])
+    if args.search:
+        raw_search = cli('download', 'search', '--type', 'ed2k',
+                         '--ed2k-mode', 'server', '--timeout', '15s',
+                         '--json', 'fixture')
+        search_snapshot = json.loads(raw_search)
+        (work / 'search.json').write_text(json.dumps(search_snapshot, indent=2) + '\n')
+        if search_snapshot.get('status') not in {'complete', 'partial'}:
+            raise AssertionError(f'unexpected search status: {search_snapshot.get("status")}')
+        results = search_snapshot.get('results', [])
+        if len(results) != 1:
+            raise AssertionError(f'expected one ED2K search result, got {len(results)}')
+        result = results[0]
+        if result.get('kind') != 'ed2k':
+            raise AssertionError(f'unexpected search result kind: {result.get("kind")}')
+        link_parts = result.get('link', '').split('|')
+        if len(link_parts) < 6 or link_parts[0] != 'ed2k://' or link_parts[1] != 'file':
+            raise AssertionError(f'invalid ED2K search link: {result.get("link")}')
+        if link_parts[4].lower() != digest:
+            raise AssertionError(f'ED2K search hash mismatch: {link_parts[4]} != {digest}')
+        if link_parts[3] != str(len(payload)):
+            raise AssertionError(f'ED2K link size mismatch: {link_parts[3]} != {len(payload)}')
+        if result.get('size') != len(payload):
+            raise AssertionError(f'ED2K search size mismatch: {result.get("size")} != {len(payload)}')
+        if result.get('name') != filename:
+            raise AssertionError(f'ED2K search name mismatch: {result.get("name")} != {filename}')
+        if result.get('peers') != 1:
+            raise AssertionError(f'ED2K search source count mismatch: {result.get("peers")} != 1')
+        evidence['steps'].append('local ED2K search returns exact fixture metadata')
+        search_download = cli('download', 'search', 'download',
+                               search_snapshot['id'], result['id'])
+        (work / 'search-download.txt').write_text(search_download)
+        job_match = re.search(r'(?m)^([0-9a-f]{12})\s+amule\s+', search_download)
+        if not job_match:
+            raise AssertionError(f'could not parse aMule search download job: {search_download!r}')
+        evidence['steps'].append('search result enqueued on the aMule engine')
+    else:
+        link = (f'ed2k://|file|{filename}|{len(payload)}|{digest}|/'
+                f'|sources,{address}:{configs["seed"]["ed2k_port"]}|/')
+        cli('download', 'add', '--detach', link)
 
     def complete():
         snapshot = json.loads(cli('download', 'list', '--json'))
@@ -146,7 +185,11 @@ finally:
             evidence.setdefault('cleanup_errors', []).append(str(error))
     server.shutdown()
     server.server_close()
-    evidence['server_logins'] = server.login_count
-    evidence['distinct_server_clients'] = len(server.client_ids)
+    with server.login_lock:
+        evidence['server_logins'] = server.login_count
+        evidence['distinct_server_clients'] = len(server.client_ids)
+        evidence['server_searches'] = server.search_count
+        evidence['server_source_requests'] = server.get_sources_count
+        evidence['search_request_bodies'] = [request.hex() for request in server.search_requests]
     (work / 'result.json').write_text(json.dumps(evidence, indent=2) + '\n')
     print('Test evidence:', work, flush=True)

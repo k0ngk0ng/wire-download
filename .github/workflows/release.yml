@@ -81,13 +81,17 @@ jobs:
           sh ".test-data/extracted/wire-download-$VERSION-$TARGET/install.sh" "$PWD/.test-data/install"
           python3 scripts/test-install.py "$PWD/.test-data/install"
       - name: Verify terminal progress and keyboard controls
-        run: python3 scripts/test-tui.py "$PWD/.test-data/install"
+        run: |
+          python3 scripts/test-tui.py "$PWD/.test-data/install"
+          python3 scripts/test-search-tui.py "$PWD/.test-data/install"
       - name: Verify BitTorrent pause and restart recovery
-        run: python3 scripts/test-bt-recovery.py "$PWD/.test-data/install"
+        run: |
+          python3 scripts/test-bt-recovery.py "$PWD/.test-data/install" --only torrent --only http-torrent-auth
+          python3 scripts/test-bt-recovery.py "$PWD/.test-data/install" --search --only http-torrent --only magnet
       - name: Verify real ED2K peer transfer
         run: |
           TEST_ADDRESS=$(python3 -c 'import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(("192.0.2.1",9)); print(s.getsockname()[0]); s.close()')
-          python3 scripts/test-ed2k.py "$PWD/.test-data/install" --address "$TEST_ADDRESS"
+          python3 scripts/test-ed2k.py "$PWD/.test-data/install" --address "$TEST_ADDRESS" --search
       - uses: actions/upload-artifact@v4
         with:
           name: binary-${{ matrix.target }}

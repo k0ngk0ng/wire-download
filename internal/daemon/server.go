@@ -173,7 +173,12 @@ func Run(ctx context.Context, dir string, c config.Config) error {
 	}
 	serveCtx, stop := context.WithCancel(ctx)
 	defer stop()
-	srv := &http.Server{Handler: Handler(store, stop), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second}
+	searches, err := NewSearchService(serveCtx, dir, eb.Search)
+	if err != nil {
+		return err
+	}
+	defer searches.manager.Close()
+	srv := &http.Server{Handler: Handler(store, stop, searches), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
 	log.Printf("wirectl ready: %s", socket)
@@ -221,8 +226,13 @@ loop:
 	cancelFlush()
 	return runErr
 }
-func Handler(store *Store, stop context.CancelFunc) http.Handler {
+func Handler(store *Store, stop context.CancelFunc, searches ...*SearchService) http.Handler {
 	mux := http.NewServeMux()
+	for _, service := range searches {
+		if service != nil {
+			service.routes(mux, store)
+		}
+	}
 	respond := func(w http.ResponseWriter, status int, v any) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)

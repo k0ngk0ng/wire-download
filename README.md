@@ -56,6 +56,63 @@ wirectl download doctor
 删除需要 `y` 确认。**删除 ed2k 未完成任务会删除 aMule 的临时分片**；已完成文件保留。
 CLI 的 `remove` 是直接执行，适合脚本调用。
 
+## 搜索与选择下载
+
+先启动 daemon，再搜索关键词：
+
+```sh
+wirectl download search ubuntu
+wirectl download search --type ed2k --ed2k-mode global '关键词'
+wirectl download search --type magnet ubuntu
+wirectl download search --type torrent --source nyaa sintel
+wirectl download search --type bt --json ubuntu
+```
+
+交互终端显示每个来源的进度、结果数和错误；方向键 / `j`、`k` 选择结果，
+Enter / `d` 下载，`q` 退出并取消尚未完成的搜索。已加入的下载任务继续运行。
+搜索本身不会自动下载。非交互模式将进度写入 stderr，最终结果写入 stdout；
+`--json` 适合脚本。所有选项放在关键词之前。
+
+BT 与磁力使用相同的网站索引；`--type bt` 同时接受种子文件和磁力，
+`--type magnet` 只返回磁力，`--type torrent` 只返回有种子下载地址的结果。
+按 info hash 合并重复结果，保留来源及可用的种子地址；电驴按文件哈希和大小去重。
+种子数和来源数来自索引或电驴网络，未提供时显示为未知/0，并不保证可下载。
+
+默认查询 Nyaa、Anime Tosho、动漫花园、BTDig 和 LinuxTracker；来源侧重不同内容，
+可按需启停。Internet Archive API 为可选来源，默认关闭。
+网站可能临时不可达、限制请求或改版；失败会按来源显示，其他成功结果仍可使用。
+不自动绕过网站验证码。支持添加 RSS 和 Torznab 索引，搜索无需额外运行索引服务；
+若使用自己的 Torznab 服务，请提供已有服务地址。
+
+```sh
+wirectl download search sources list
+wirectl download search sources disable nyaa
+wirectl download search sources enable nyaa
+wirectl download search sources add --id myrss --name 'My RSS' --type rss --url 'https://example.org/rss?q={query}'
+wirectl download search sources add --id myindex --name 'My Index' --type torznab --url 'https://example.org/api' --api-key-env MY_INDEX_KEY
+wirectl download search sources remove myrss
+```
+
+来源配置存于状态目录 `search-sources.json`，权限 0600。API key 从指定环境变量读取，
+不需要写入命令参数；来源列表不返回 key。通过 CLI 修改立即影响新搜索。
+`--source` 接受逗号分隔的来源 ID，`--limit` 为 1–200，`--timeout` 为 5s–180s。
+
+电驴支持 `--ed2k-mode server|global|kad|all`，分别查询当前服务器、服务器列表、
+Kad，或依次查询 global 和 Kad；默认 all。全局查询在设定的时间窗口内持续收集，
+进度按该时间窗口显示，不把 aMule 瞬时进度值当成全部服务器已完成的保证。同一个 aMule 引擎一次只进行一个搜索，
+后续搜索等待前一个完成或取消。需要对应网络已连接；Kad 刚启动可能需要引导时间。
+BT 的 DHT 用于通过已知哈希寻找 peer，关键词检索来自网站索引。
+
+结果保存在 daemon 内存中，最多 16 个搜索会话，后续搜索会淘汰旧的已完成会话；
+重启 daemon 后不保留。每个搜索最多保留 1000 个去重结果，超过显示上限会标记截断。
+可使用结果中的稳定 ID 再次查看或提交下载：
+
+```sh
+wirectl download search results --json <search-id>
+wirectl download search download <search-id> <result-id>
+wirectl download search cancel <search-id>
+```
+
 ## 网站登录（可选）
 
 公开 HTTP(S) 地址不需要登录。需要网站 cookie 的下载可以先为该网站保存一个会话：
@@ -106,7 +163,7 @@ wirectl download --data-dir /srv/wire-download daemon run
 
 | 配置 | 默认值 / 含义 |
 | --- | --- |
-| `downloads` | `~/Downloads/wire-download` |
+| `downloads` | `~/Downloads` |
 | `max_downloads` | aria2 同时下载 5 个任务 |
 | `download_limit` | `0`，不限速 |
 | `upload_limit` | `1M`，每个引擎各自的总上传上限 |
@@ -122,8 +179,8 @@ torrent.eu.org、tamersunion 的公共 tracker。DHT 默认引导地址为
 `dht.transmissionbt.com:6881`。私有 torrent 是否允许 DHT/PEX 由 aria2 按 torrent 标记处理。
 支持 v1 和含 v1 info hash 的 hybrid torrent；aria2 不支持纯 BitTorrent v2 / btmh magnet。
 
-eMule 默认启用 ED2K 和 Kad。初次启动通过 HTTPS 获取 eMule Security / gruk 的
-`server.met`，验证结构后原子写入。离线时使用 2026-09-12 获取的内置服务器列表，
+eMule 默认启用 ED2K 和 Kad。初次启动通过 HTTPS 获取 eMule Security / gruk / Shortypower 的
+`server.met`，并发获取、验证结构后按 IP/端口去重合并，再原子写入。离线时使用 2026-09-12 获取的内置服务器列表，
 并提供同来源的 Kad `nodes.dat` 初始节点。已有引擎节点状态不会被覆盖。
 公共服务器、tracker 和节点可用性会随时间变化，配置中可替换地址。
 
@@ -189,7 +246,7 @@ WIRECTL_TEST_ARIA2=/absolute/path/to/aria2c make test
 不配置真实引擎时，相关测试会明确 skip，不能据此宣称协议已完成实测。
 发行包必须包含所有引擎，不能把仅 Go 二进制的开发构建当作自包含发行包。
 
-在目标系统上执行 `VERSION=0.1.3 make release` 构建完整候选包。
+在目标系统上执行 `VERSION=0.2.0 make release` 构建完整候选包。
 构建机需要 Go、Python 3、C/C++ 工具链、make、curl、tar；Linux 还需要
 OpenSSL/zlib 开发文件和 patchelf。引擎源代码下载均校验固定 SHA256。
 `dist/` 生成安装归档、单独的对应源码归档和校验和；终端用户只需安装归档。
@@ -201,6 +258,8 @@ OpenSSL/zlib 开发文件和 patchelf。引擎源代码下载均校验固定 SHA
 python3 scripts/test-install.py /absolute/path/to/test-install-prefix
 python3 scripts/test-tui.py /absolute/path/to/test-install-prefix
 python3 scripts/test-bt-recovery.py /absolute/path/to/test-install-prefix
+python3 scripts/test-bt-recovery.py /absolute/path/to/test-install-prefix --search --only http-torrent --only magnet
+python3 scripts/test-ed2k.py /absolute/path/to/test-install-prefix --address <本机非回环IPv4> --search
 ```
 
 这些验收在精简 PATH 下启动安装包中的引擎，验证 HTTP 登录下载和重启续传、

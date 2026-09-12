@@ -6,6 +6,8 @@ github.com/gorilla/websocket
 github.com/k0ngk0ng/wirectl/cli
 # golang.org/x/net v0.37.0
 ## explicit; go 1.23.0
+golang.org/x/net/html
+golang.org/x/net/html/atom
 golang.org/x/net/publicsuffix
 # golang.org/x/sys v0.31.0
 ## explicit; go 1.23.0

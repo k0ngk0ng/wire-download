@@ -93,6 +93,7 @@ func run(ctx context.Context, args []string) error {
 		return nil
 	}
 	app := cli.App{Name: "wirectl download", Description: "HTTP(S) / ed2k / BitTorrent / magnet downloads; pass a URL or torrent file directly\nGlobal option: --data-dir <path> (before the subcommand), or WIRECTL_DOWNLOAD_HOME", Default: download, Commands: map[string]cli.Command{}}
+	app.Commands["search"] = cli.Command{Summary: "Search eMule, torrent and magnet indexes with live results", Run: func(ctx context.Context, args []string) error { return searchCommand(ctx, c, args) }}
 	app.Commands["add"] = cli.Command{Summary: "Enqueue links or torrent files", Run: download}
 	app.Commands["login"] = cli.Command{Summary: "Browser login for HTTP(S), optionally --remote user@server", Run: func(ctx context.Context, args []string) error { return loginCommand(ctx, *dir, args) }}
 	app.Commands["logout"] = cli.Command{Summary: "Forget a website's saved download session", Run: func(ctx context.Context, args []string) error {
@@ -104,7 +105,7 @@ func run(ctx context.Context, args []string) error {
 	app.Commands["init"] = cli.Command{Summary: "Create private configuration", Run: func(ctx context.Context, args []string) error {
 		fs := flag.NewFlagSet("init", flag.ContinueOnError)
 		home, _ := os.UserHomeDir()
-		downloads := fs.String("downloads", filepath.Join(home, "Downloads", "wire-download"), "Download directory")
+		downloads := fs.String("downloads", filepath.Join(home, "Downloads"), "Download directory")
 		if err := fs.Parse(args); err != nil {
 			return err
 		}
