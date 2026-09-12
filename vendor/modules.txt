@@ -1,0 +1,18 @@
+# github.com/gorilla/websocket v1.5.3
+## explicit; go 1.12
+github.com/gorilla/websocket
+# github.com/k0ngk0ng/wirectl v0.1.0 => ../wirectl
+## explicit; go 1.23
+github.com/k0ngk0ng/wirectl/cli
+# golang.org/x/net v0.37.0
+## explicit; go 1.23.0
+golang.org/x/net/publicsuffix
+# golang.org/x/sys v0.31.0
+## explicit; go 1.23.0
+golang.org/x/sys/plan9
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# golang.org/x/term v0.30.0
+## explicit; go 1.23.0
+golang.org/x/term
+# github.com/k0ngk0ng/wirectl => ../wirectl

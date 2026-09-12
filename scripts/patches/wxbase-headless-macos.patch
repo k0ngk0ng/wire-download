@@ -1,0 +1,24 @@
+--- a/src/osx/core/evtloop_cf.cpp
++++ b/src/osx/core/evtloop_cf.cpp
+@@ -453,6 +453,10 @@
+ 
+ void wxMutexGuiEnterImpl()
+ {
++    // wiredown: headless wxBase does not initialize the GUI critical sections.
++    if ( !gs_critsectWaitingForGui )
++        return;
++
+     // this would dead lock everything...
+     wxASSERT_MSG( !wxThread::IsMain(),
+                  wxT("main thread doesn't want to block in wxMutexGuiEnter()!") );
+@@ -475,6 +479,10 @@
+ 
+ void wxMutexGuiLeaveImpl()
+ {
++    // wiredown: headless wxBase does not initialize the GUI critical sections.
++    if ( !gs_critsectWaitingForGui )
++        return;
++
+     wxCriticalSectionLocker enter(*gs_critsectWaitingForGui);
+ 
+     if ( wxThread::IsMain() )

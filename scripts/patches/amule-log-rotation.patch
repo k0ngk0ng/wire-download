@@ -1,0 +1,23 @@
+--- a/src/Logger.cpp
++++ b/src/Logger.cpp
+@@ -23,6 +23,7 @@
+ //
+ 
+ #include "Logger.h"
++#include <wx/filefn.h>
+ #include "amule.h"
+ #include "Preferences.h"
+ #include <common/Macros.h>
+@@ -289,6 +290,12 @@
+ void CLogger::FlushApplog()
+ {
+ 	if (applog) { // Wait with output until logfile is actually opened
++		// Keep the managed daemon log bounded during long-running EC polling.
++		if (!m_LogfileName.IsEmpty() && applog->TellO() >= 8 * 1024 * 1024) {
++			delete applog;
++			wxRenameFile(m_LogfileName, m_LogfileName + wxT(".1"), true);
++			applog = new wxFFileOutputStream(m_LogfileName);
++		}
+ 		wxStringInputStream stream(m_ApplogBuf);
+ 		(*applog) << stream;
+ 		applog->Sync();

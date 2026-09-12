@@ -1,0 +1,137 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (for example v0.1.0)'
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os,re
+          tag=os.environ['RELEASE_TAG']
+          if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?',tag):
+              raise SystemExit('Expected a version tag such as v0.1.0')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write(f'tag={tag}\nversion={tag[1:]}\n')
+          PY
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64
+            runner: ubuntu-24.04
+            container: golang:1.26.2-bookworm
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            container: golang:1.26.2-bookworm
+          - target: darwin-amd64
+            runner: macos-15-intel
+          - target: darwin-arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container || '' }}
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TARGET: ${{ matrix.target }}
+      JOBS: '4'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+      - uses: actions/setup-go@v5
+        if: startsWith(matrix.target, 'darwin')
+        with:
+          go-version: '1.26.2'
+          cache: false
+      - name: Linux build tools
+        if: startsWith(matrix.target, 'linux')
+        run: |
+          sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential autoconf automake libtool pkg-config curl ca-certificates patch xz-utils bzip2 python3 libssl-dev zlib1g-dev patchelf
+      - name: Build full distribution and run real protocol tests
+        run: sh scripts/release.sh
+      - name: Install archive and verify HTTP, login, and restart recovery
+        run: |
+          mkdir -p .test-data/extracted
+          tar -xzf "dist/wire-download-$VERSION-$TARGET.tar.gz" -C .test-data/extracted
+          sh ".test-data/extracted/wire-download-$VERSION-$TARGET/install.sh" "$PWD/.test-data/install"
+          python3 scripts/test-install.py "$PWD/.test-data/install"
+      - name: Verify real ED2K peer transfer
+        run: |
+          TEST_ADDRESS=$(python3 -c 'import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(("192.0.2.1",9)); print(s.getsockname()[0]); s.close()')
+          python3 scripts/test-ed2k.py "$PWD/.test-data/install" --address "$TEST_ADDRESS"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: dist/wire-download-${{ env.VERSION }}-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: matrix.target == 'linux-arm64'
+        with:
+          name: corresponding-source
+          path: dist/wire-download-${{ env.VERSION }}-sources.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: diagnostics-${{ matrix.target }}
+          path: |
+            .cache/amule-build/logs/
+            .cache/engines/aria2-build/*.log
+            .test-data/**/result.json
+            .test-data/**/logs/*.log
+          retention-days: 7
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Verify complete asset set and create checksums
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          cd release-assets
+          for TARGET in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
+            test -s "wire-download-$VERSION-$TARGET.tar.gz"
+          done
+          test -s "wire-download-$VERSION-sources.tar.gz"
+          sha256sum ./*.tar.gz > SHA256SUMS
+      - name: Publish release after every platform passes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" release-assets/* --target "$GITHUB_SHA" --draft --title "$TAG" --notes-file RELEASE_NOTES.md
+          gh release edit "$TAG" --draft=false

@@ -1,0 +1,139 @@
+--- a/boost/numeric/conversion/converter_policies.hpp
++++ b/boost/numeric/conversion/converter_policies.hpp
+@@ -21,7 +21,7 @@
+ #include "boost/type_traits/is_arithmetic.hpp"
+ 
+ #include "boost/mpl/if.hpp"
+-#include "boost/mpl/integral_c.hpp"
++#include "boost/type_traits/integral_constant.hpp"
+ 
+ namespace boost { namespace numeric
+ {
+@@ -43,7 +43,7 @@
+     return s < static_cast<S>(0) ? ceil(s) : floor(s) ;
+   }
+ 
+-  typedef mpl::integral_c< std::float_round_style, std::round_toward_zero> round_style ;
++  typedef boost::integral_constant< std::float_round_style, std::round_toward_zero> round_style ;
+ } ;
+ 
+ 
+@@ -64,7 +64,7 @@
+     return floor(s) ;
+   }
+ 
+-  typedef mpl::integral_c< std::float_round_style, std::round_toward_neg_infinity> round_style ;
++  typedef boost::integral_constant< std::float_round_style, std::round_toward_neg_infinity> round_style ;
+ } ;
+ 
+ template<class S>
+@@ -83,7 +83,7 @@
+     return ceil(s) ;
+   }
+ 
+-  typedef mpl::integral_c< std::float_round_style, std::round_toward_infinity> round_style ;
++  typedef boost::integral_constant< std::float_round_style, std::round_toward_infinity> round_style ;
+ } ;
+ 
+ template<class S>
+@@ -122,7 +122,7 @@
+     }
+   }
+ 
+-  typedef mpl::integral_c< std::float_round_style, std::round_to_nearest> round_style ;
++  typedef boost::integral_constant< std::float_round_style, std::round_to_nearest> round_style ;
+ } ;
+ 
+ 
+--- a/boost/numeric/conversion/detail/sign_mixture.hpp
++++ b/boost/numeric/conversion/detail/sign_mixture.hpp
+@@ -16,15 +16,15 @@
+ #include "boost/numeric/conversion/sign_mixture_enum.hpp"
+ #include "boost/numeric/conversion/detail/meta.hpp"
+ 
+-#include "boost/mpl/integral_c.hpp"
++#include "boost/type_traits/integral_constant.hpp"
+ 
+ namespace boost { namespace numeric { namespace convdetail
+ {
+   // Integral Constants for 'SignMixture'
+-  typedef mpl::integral_c<sign_mixture_enum, unsigned_to_unsigned> unsig2unsig_c ;
+-  typedef mpl::integral_c<sign_mixture_enum, signed_to_signed>     sig2sig_c ;
+-  typedef mpl::integral_c<sign_mixture_enum, signed_to_unsigned>   sig2unsig_c ;
+-  typedef mpl::integral_c<sign_mixture_enum, unsigned_to_signed>   unsig2sig_c ;
++  typedef boost::integral_constant<sign_mixture_enum, unsigned_to_unsigned> unsig2unsig_c ;
++  typedef boost::integral_constant<sign_mixture_enum, signed_to_signed>     sig2sig_c ;
++  typedef boost::integral_constant<sign_mixture_enum, signed_to_unsigned>   sig2unsig_c ;
++  typedef boost::integral_constant<sign_mixture_enum, unsigned_to_signed>   unsig2sig_c ;
+ 
+   // Metafunction:
+   //
+--- a/boost/numeric/conversion/detail/udt_builtin_mixture.hpp
++++ b/boost/numeric/conversion/detail/udt_builtin_mixture.hpp
+@@ -15,15 +15,15 @@
+ #include "boost/numeric/conversion/udt_builtin_mixture_enum.hpp"
+ #include "boost/numeric/conversion/detail/meta.hpp"
+ 
+-#include "boost/mpl/integral_c.hpp"
++#include "boost/type_traits/integral_constant.hpp"
+ 
+ namespace boost { namespace numeric { namespace convdetail
+ {
+   // Integral Constants for 'UdtMixture'
+-  typedef mpl::integral_c<udt_builtin_mixture_enum, builtin_to_builtin> builtin2builtin_c ;
+-  typedef mpl::integral_c<udt_builtin_mixture_enum, builtin_to_udt>     builtin2udt_c ;
+-  typedef mpl::integral_c<udt_builtin_mixture_enum, udt_to_builtin>     udt2builtin_c ;
+-  typedef mpl::integral_c<udt_builtin_mixture_enum, udt_to_udt>         udt2udt_c ;
++  typedef boost::integral_constant<udt_builtin_mixture_enum, builtin_to_builtin> builtin2builtin_c ;
++  typedef boost::integral_constant<udt_builtin_mixture_enum, builtin_to_udt>     builtin2udt_c ;
++  typedef boost::integral_constant<udt_builtin_mixture_enum, udt_to_builtin>     udt2builtin_c ;
++  typedef boost::integral_constant<udt_builtin_mixture_enum, udt_to_udt>         udt2udt_c ;
+ 
+   // Metafunction:
+   //
+--- a/boost/numeric/conversion/detail/int_float_mixture.hpp
++++ b/boost/numeric/conversion/detail/int_float_mixture.hpp
+@@ -16,15 +16,15 @@
+ #include "boost/numeric/conversion/int_float_mixture_enum.hpp"
+ #include "boost/numeric/conversion/detail/meta.hpp"
+ 
+-#include "boost/mpl/integral_c.hpp"
++#include "boost/type_traits/integral_constant.hpp"
+ 
+ namespace boost { namespace numeric { namespace convdetail
+ {
+   // Integral Constants for 'IntFloatMixture'
+-  typedef mpl::integral_c<int_float_mixture_enum, integral_to_integral> int2int_c ;
+-  typedef mpl::integral_c<int_float_mixture_enum, integral_to_float>    int2float_c ;
+-  typedef mpl::integral_c<int_float_mixture_enum, float_to_integral>    float2int_c ;
+-  typedef mpl::integral_c<int_float_mixture_enum, float_to_float>       float2float_c ;
++  typedef boost::integral_constant<int_float_mixture_enum, integral_to_integral> int2int_c ;
++  typedef boost::integral_constant<int_float_mixture_enum, integral_to_float>    int2float_c ;
++  typedef boost::integral_constant<int_float_mixture_enum, float_to_integral>    float2int_c ;
++  typedef boost::integral_constant<int_float_mixture_enum, float_to_float>       float2float_c ;
+ 
+   // Metafunction:
+   //
+--- a/boost/numeric/conversion/detail/converter.hpp
++++ b/boost/numeric/conversion/detail/converter.hpp
+@@ -18,15 +18,15 @@
+ 
+ #include "boost/type_traits/is_same.hpp"
+ 
+-#include "boost/mpl/integral_c.hpp"
++#include "boost/type_traits/integral_constant.hpp"
+ 
+ namespace boost { namespace numeric { namespace convdetail
+ {
+   // Integral Constants representing rounding modes
+-  typedef mpl::integral_c<std::float_round_style, std::round_toward_zero>         round2zero_c ;
+-  typedef mpl::integral_c<std::float_round_style, std::round_to_nearest>          round2nearest_c ;
+-  typedef mpl::integral_c<std::float_round_style, std::round_toward_infinity>     round2inf_c ;
+-  typedef mpl::integral_c<std::float_round_style, std::round_toward_neg_infinity> round2neg_inf_c ;
++  typedef boost::integral_constant<std::float_round_style, std::round_toward_zero>         round2zero_c ;
++  typedef boost::integral_constant<std::float_round_style, std::round_to_nearest>          round2nearest_c ;
++  typedef boost::integral_constant<std::float_round_style, std::round_toward_infinity>     round2inf_c ;
++  typedef boost::integral_constant<std::float_round_style, std::round_toward_neg_infinity> round2neg_inf_c ;
+ 
+   // Metafunction:
+   //
