@@ -4,7 +4,7 @@
 可直接运行 `wirectl-download`。它支持 HTTP/HTTPS、ed2k、BitTorrent 和 magnet。
 CLI 通过私有 Unix socket 控制独立 daemon；关闭终端或退出仪表盘不会中断下载。
 
-公共入口与 CLI 库位于同级 [`wirectl`](../wirectl) 仓库。这里提供
+CLI 入口与库位于同级的 [`wirectl`](../wirectl) 仓库，该仓库需要相应访问权限。这里提供
 `wirectl-download` 插件，其他仓库可独立提供 `wirectl-xxx`，不需要修改下载器。
 
 ## 安装与使用
@@ -228,11 +228,11 @@ aMule 文本接口仅提供百分比，其已下载字节数根据链接大小�
 
 ## 开发与验证
 
-需要 Go 1.23+，并把公共 `wirectl` 库放在当前仓库的同级目录。
-公共库已独立发布为 `github.com/k0ngk0ng/wirectl v0.1.0`。本地 replace 便于跨仓库开发，下载项目已 vendor 依赖，发布构建无需访问另一个私有仓库。
+需要 Go 1.23+。跨仓库开发时，可把有权限访问的 `wirectl` 库放在当前仓库的同级目录；下载项目已 vendor 依赖，公开仓库的测试和发布构建无需访问该私有源仓库。
+CLI 库模块版本为 `github.com/k0ngk0ng/wirectl v0.1.0`，本地 replace 仅用于跨仓库开发。
 
 ```sh
-make check       # race tests + vet，包含公共库
+make check       # race tests + vet；有同级 wirectl 源码时一并检查
 make build       # bin/wirectl 和 bin/wirectl-download
 ```
 
@@ -276,10 +276,12 @@ Go CLI 使用 `golang.org/x/term`、`golang.org/x/sys`、`golang.org/x/net`（BS
 
 ## GitHub Release
 
-两个仓库均为私有，仅有权限的用户可访问源码和 Release。下载器推送 `v*` 标签后，
-GitHub Actions 原生构建 macOS/Linux 的 amd64、arm64 安装包，并运行真实协议及安装恢复测试。
-四个平台全部成功后，才发布安装包、SHA256SUMS 和对应源码归档。
-使用者只需安装对应平台的一个安装包，公共 CLI 和下载引擎均包含在内。
+[`k0ngk0ng/wire-download`](https://github.com/k0ngk0ng/wire-download) 是公开仓库，源码和
+[GitHub Releases](https://github.com/k0ngk0ng/wire-download/releases) 可直接访问；同级
+`wirectl` 源仓库保持私有。下载器推送 `v*` 标签后，GitHub Actions 原生构建
+macOS/Linux 的 amd64、arm64 安装包，并运行真实协议及安装恢复测试。
+四个平台全部成功后，公开发布安装包、SHA256SUMS 和对应源码归档。发行包已包含
+`wirectl` CLI 和下载引擎，使用者无需访问 `wirectl` 源仓库。
 
 Linux 发布构建需要启用 Debian `deb-src` 软件源，以下载随包运行库的精确对应源码；
 工作流和 `scripts/linux/Dockerfile` 已配置。源码归档供审查和重建使用，不是安装依赖。
