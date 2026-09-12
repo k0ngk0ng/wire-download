@@ -43,8 +43,6 @@ jobs:
           - target: linux-arm64
             runner: ubuntu-24.04-arm
             container: golang:1.26.2-bookworm
-          - target: darwin-amd64
-            runner: macos-15-intel
           - target: darwin-arm64
             runner: macos-15
     runs-on: ${{ matrix.runner }}
@@ -131,7 +129,7 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           cd release-assets
-          for TARGET in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
+          for TARGET in darwin-arm64 linux-arm64 linux-amd64; do
             test -s "wire-download-$VERSION-$TARGET.tar.gz"
           done
           test -s "wire-download-$VERSION-sources.tar.gz"

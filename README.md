@@ -11,10 +11,10 @@ CLI 入口与库位于同级的 [`wirectl`](../wirectl) 仓库，该仓库需要
 
 每个发行归档都是一个自包含的 macOS 或 Linux 目标包，包含主入口、下载插件、aria2
 和无 GUI 的 aMule 引擎；不需要另装引擎。安装脚本不访问网络，也不调用系统包管理器。
-发布工作流分别构建 `darwin-arm64`、`darwin-amd64`、`linux-arm64` 和
-`linux-amd64`，选择与你的系统和 CPU 匹配的归档即可。它们是按目标分别打包的原生
-归档，不是一个跨架构文件。macOS 原生引擎的最低构建目标为 macOS 13；Linux 引擎
-构建和验收环境是 Debian 12 / glibc 2.36，其他发行版需要自行验证。
+发布工作流分别构建 `darwin-arm64`、`linux-arm64` 和 `linux-amd64`，选择与你的系统和
+CPU 匹配的归档即可。当前不提供 macOS Intel（amd64）归档。它们是按目标分别打包的
+原生归档，不是一个跨架构文件。macOS 原生引擎的最低构建目标为 macOS 13；Linux
+引擎构建和验收环境是 Debian 12 / glibc 2.36，其他发行版需要自行验证。
 
 ```sh
 tar -xzf wire-download-<version>-<os>-<arch>.tar.gz
@@ -265,7 +265,7 @@ python3 scripts/test-ed2k.py /absolute/path/to/test-install-prefix --address <�
 这些验收在精简 PATH 下启动安装包中的引擎，验证 HTTP 登录下载和重启续传、
 真实终端进度与键盘控制，以及本地 torrent、HTTP torrent 和 magnet 的暂停重启恢复。
 BT 恢复保留用户看到的任务 ID；引擎内部的元数据子任务 ID 可以变化。
-ED2K 实际传输使用 `scripts/test-ed2k.py`；Release 工作流在四个目标平台运行全部验收。
+ED2K 实际传输使用 `scripts/test-ed2k.py`；Release 工作流在三个目标平台运行全部验收。
 
 ## 第三方组件
 
@@ -279,8 +279,8 @@ Go CLI 使用 `golang.org/x/term`、`golang.org/x/sys`、`golang.org/x/net`（BS
 [`k0ngk0ng/wire-download`](https://github.com/k0ngk0ng/wire-download) 是公开仓库，源码和
 [GitHub Releases](https://github.com/k0ngk0ng/wire-download/releases) 可直接访问；同级
 `wirectl` 源仓库保持私有。下载器推送 `v*` 标签后，GitHub Actions 原生构建
-macOS/Linux 的 amd64、arm64 安装包，并运行真实协议及安装恢复测试。
-四个平台全部成功后，公开发布安装包、SHA256SUMS 和对应源码归档。发行包已包含
+macOS arm64 和 Linux amd64、arm64 安装包，并运行真实协议及安装恢复测试。
+三个平台全部成功后，公开发布安装包、SHA256SUMS 和对应源码归档。发行包已包含
 `wirectl` CLI 和下载引擎，使用者无需访问 `wirectl` 源仓库。
 
 Linux 发布构建需要启用 Debian `deb-src` 软件源，以下载随包运行库的精确对应源码；
