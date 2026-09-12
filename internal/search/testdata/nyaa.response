@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:nyaa="https://nyaa.si/xmlns/nyaa">
+  <channel>
+    <title>Fixture RSS</title>
+    <item>
+      <title>[Devil-fansub] Sintel 2010[BluRay][B8D00F91]</title>
+      <link>https://example.invalid/download/sample.torrent</link>
+      <nyaa:infoHash>d8ffc008b02c79e68510afaa851838b604d7ba70</nyaa:infoHash>
+      <nyaa:size>523.5 MiB</nyaa:size>
+    </item>
+  </channel>
+</rss>

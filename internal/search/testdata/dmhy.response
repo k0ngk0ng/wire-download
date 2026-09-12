@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Fixture RSS</title>
+    <item>
+      <title><![CDATA[[philosophy-raws][辛特尔][sintel][HI444PP FLAC][4096x1776][BT.2020+YCOGO][简繁英字幕]]]></title>
+      <link>https://example.invalid/topics/fixture.html</link>
+      <enclosure url="magnet:?xt=urn:btih:6BU5A43F7M4GRGEQ67YPXLFCSCUNBW47&amp;dn=fixture" length="1" type="application/x-bittorrent"/>
+    </item>
+  </channel>
+</rss>

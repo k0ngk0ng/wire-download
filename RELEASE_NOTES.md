@@ -1,4 +1,4 @@
-# wirectl download 0.2.0
+# wirectl download 0.2.1
 
 新增电驴、BT 和磁力关键词搜索，使用 `wirectl download search <关键词>`。交互终端显示各来源进度及结果，选择结果后按 Enter 下载；也支持 JSON 输出与按结果 ID 下载。
 

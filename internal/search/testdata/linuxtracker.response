@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <table>
+      <tbody>
+        <tr>
+          <td><a title="View details: Fixture Linux image" href="https://example.invalid/details/one">Fixture Linux image</a></td>
+          <td><a href="magnet:?xt=urn:btih:d8ffc008b02c79e68510afaa851838b604d7ba70&amp;dn=fixture-one">magnet</a></td>
+          <td>Size: 1.5 GiB Seeds: 17 Peers: 4</td>
+        </tr>
+        <tr>
+          <td><a title="View details: Fixture source archive" href="https://example.invalid/details/two">Fixture source archive</a></td>
+          <td><a href="magnet:?xt=urn:btih:6BU5A43F7M4GRGEQ67YPXLFCSCUNBW47&amp;dn=fixture-two">magnet</a></td>
+          <td>Size: 2.0 GiB Seeds: 3 Peers: 1</td>
+        </tr>
+      </tbody>
+    </table>
+    <script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>
+  </body>
+</html>

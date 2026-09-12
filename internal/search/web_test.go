@@ -2,18 +2,24 @@ package search
 
 import (
 	"context"
+	"embed"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
+// These small, sanitized captures keep parser tests deterministic and
+// runnable from a clean checkout. The original live-research responses are
+// intentionally not part of the repository.
+//
+//go:embed testdata/*.response
+var webTestFixtures embed.FS
+
 func searchFixture(t *testing.T, name string) []byte {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("..", "..", ".test-data", "search-research", name+".response"))
+	b, err := webTestFixtures.ReadFile("testdata/" + name + ".response")
 	if err != nil {
 		t.Fatal(err)
 	}

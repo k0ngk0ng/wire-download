@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <form><input name="q"/></form>
+    <div class="one_result">
+      <a class="torrent_name" href="https://example.invalid/torrent/one">Fixture Linux image</a>
+      <span class="torrent_size">1.5 GiB</span>
+      <div class="torrent_magnet"><a href="magnet:?xt=urn:btih:d8ffc008b02c79e68510afaa851838b604d7ba70&amp;dn=fixture-one">magnet</a></div>
+    </div>
+    <div class="one_result">
+      <a class="torrent_name" href="https://example.invalid/torrent/two">Fixture source archive</a>
+      <span class="torrent_size">2.0 GiB</span>
+      <div class="torrent_magnet"><a href="magnet:?xt=urn:btih:6BU5A43F7M4GRGEQ67YPXLFCSCUNBW47&amp;dn=fixture-two">magnet</a></div>
+    </div>
+  </body>
+</html>

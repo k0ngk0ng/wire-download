@@ -246,7 +246,7 @@ WIRECTL_TEST_ARIA2=/absolute/path/to/aria2c make test
 不配置真实引擎时，相关测试会明确 skip，不能据此宣称协议已完成实测。
 发行包必须包含所有引擎，不能把仅 Go 二进制的开发构建当作自包含发行包。
 
-在目标系统上执行 `VERSION=0.2.0 make release` 构建完整候选包。
+在目标系统上执行 `VERSION=0.2.1 make release` 构建完整候选包。
 构建机需要 Go、Python 3、C/C++ 工具链、make、curl、tar；Linux 还需要
 OpenSSL/zlib 开发文件和 patchelf。引擎源代码下载均校验固定 SHA256。
 `dist/` 生成安装归档、单独的对应源码归档和校验和；终端用户只需安装归档。
