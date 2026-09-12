@@ -189,7 +189,7 @@ WIRECTL_TEST_ARIA2=/absolute/path/to/aria2c make test
 不配置真实引擎时，相关测试会明确 skip，不能据此宣称协议已完成实测。
 发行包必须包含所有引擎，不能把仅 Go 二进制的开发构建当作自包含发行包。
 
-在目标系统上执行 `VERSION=0.1.0-rc.4 make release` 构建完整候选包。
+在目标系统上执行 `VERSION=0.1.0 make release` 构建完整候选包。
 构建机需要 Go、Python 3、C/C++ 工具链、make、curl、tar；Linux 还需要
 OpenSSL/zlib 开发文件和 patchelf。引擎源代码下载均校验固定 SHA256。
 `dist/` 生成安装归档、单独的对应源码归档和校验和；终端用户只需安装归档。
@@ -209,7 +209,7 @@ daemon 重启后续传、内容校验和完成文件保留。ED2K 实际传输�
 
 aria2（GPL-2.0-or-later）、aMule（GPL-2.0-or-later）、wxWidgets（wxWindows Library
 Licence）、Crypto++ 和 Boost（Boost Software License）作为独立引擎和静态构建依赖。
-Go CLI 使用 `golang.org/x/term`、`golang.org/x/sys`（BSD-3-Clause）。
+Go CLI 使用 `golang.org/x/term`、`golang.org/x/sys`、`golang.org/x/net`（BSD-3-Clause）和 `gorilla/websocket`（BSD-2-Clause）。
 打包时附带各组件许可证和对应源码/构建说明；不要省略 GPL/LGPL 对源码分发的要求。
 
 ## GitHub Release
