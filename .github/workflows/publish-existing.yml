@@ -1,0 +1,82 @@
+name: Publish verified artifacts
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag
+        required: true
+      run_id:
+        description: Release run containing successful builds for all supported platforms
+        required: true
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+      BUILD_RUN: ${{ inputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tag and successful native builds
+        run: |
+          mkdir -p verification
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" > verification/run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN/jobs" > verification/jobs.json
+          gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha > verification/commit.txt
+          python3 - <<'PY'
+          import json,os,pathlib,re
+          tag=os.environ['TAG']
+          if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?',tag):
+              raise SystemExit('Invalid release tag')
+          p=pathlib.Path('verification')
+          run=json.loads((p/'run.json').read_text())
+          sha=(p/'commit.txt').read_text().strip()
+          assert run['head_sha']==sha, 'Build commit does not match release tag'
+          assert run['path']=='.github/workflows/release.yml', 'Not a release build'
+          assert run['event'] in ('push','workflow_dispatch'), 'Untrusted build event'
+          assert run['status']=='completed', 'Build run is still active'
+          jobs=json.loads((p/'jobs.json').read_text())['jobs']
+          for target in ('darwin-arm64','linux-arm64','linux-amd64'):
+              matches=[j for j in jobs if j['name'].startswith('build ('+target+',')]
+              assert len(matches)==1 and matches[0]['conclusion']=='success', target+' did not pass'
+          print('Verified all supported native builds for',tag,sha)
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          pattern: binary-*
+          path: release-assets
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          name: corresponding-source
+          path: release-assets
+      - name: Verify asset set and publish
+        run: |
+          python3 - <<'PY'
+          import hashlib,os,pathlib
+          p=pathlib.Path('release-assets')
+          version=os.environ['TAG'][1:]
+          expected={f'wire-download-{version}-{target}.tar.gz' for target in ('darwin-arm64','linux-arm64','linux-amd64','sources')}
+          files={f.name for f in p.iterdir()}
+          assert files==expected, f'Unexpected asset set: {files}'
+          with (p/'SHA256SUMS').open('w') as out:
+              for name in sorted(expected):
+                  f=p/name
+                  assert f.stat().st_size>0, name+' is empty'
+                  with f.open('rb') as stream:
+                      digest=hashlib.file_digest(stream,'sha256').hexdigest()
+                  out.write(f'{digest}  {name}\n')
+          PY
+          gh release create "$TAG" release-assets/* --verify-tag --draft --title "$TAG" --notes-file RELEASE_NOTES.md
+          gh release edit "$TAG" --draft=false
