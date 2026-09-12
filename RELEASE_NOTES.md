@@ -1,11 +1,10 @@
-# wirectl download 0.2.1
+# wirectl download 0.2.2
 
-新增电驴、BT 和磁力关键词搜索，使用 `wirectl download search <关键词>`。交互终端显示各来源进度及结果，选择结果后按 Enter 下载；也支持 JSON 输出与按结果 ID 下载。
+新增 shell 补全命令：`wirectl download completion bash|zsh|fish`。生成脚本无需初始化配置或启动 daemon，同时支持 `wirectl download` 和 `wirectl-download`。
 
-- 电驴通过 aMule EC 协议获取准确的文件哈希、大小和来源，支持当前服务器、全局服务器与 Kad 搜索。多份 HTTPS `server.met` 并发获取、验证并按 IP/端口合并。
-- 默认网站索引：Nyaa、Anime Tosho、动漫花园、BTDig、LinuxTracker。支持按 info hash 去重、保留磁力与种子地址、来源失败时保留其他结果；可添加 RSS/Torznab 来源并管理启停。Internet Archive API 为可选来源，默认关闭。
-- 搜索任务可取消；与后台下载独立运行。搜索结果仅保存在 daemon 内存中，重启后清除。
-- 新配置默认下载到 `~/Downloads`，升级保留已有下载目录及配置。
+- 补全下载与搜索子命令、选项、固定枚举值，以及文件和目录路径。
+- README 增加 Bash、Zsh、Fish 加载说明，以及查看当前配置和 eMule 服务器列表的方法。
+- 修正 README 中 `wirectl` 源仓库链接为 https://github.com/k0ngk0ng/wirectl。
 
 提供 macOS arm64、Linux arm64 和 Linux amd64 安装包；当前不提供 macOS Intel（amd64）安装包。每个包包含 wirectl、下载插件及 aria2/aMule 引擎，无需额外安装下载或搜索依赖。macOS 要求 13+，Linux 要求 glibc 2.36+。可选浏览器登录需要桌面端已有 Chromium 浏览器；远端传入会话需要 SSH 客户端。
 

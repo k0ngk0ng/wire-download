@@ -4,7 +4,7 @@
 可直接运行 `wirectl-download`。它支持 HTTP/HTTPS、ed2k、BitTorrent 和 magnet。
 CLI 通过私有 Unix socket 控制独立 daemon；关闭终端或退出仪表盘不会中断下载。
 
-CLI 入口与库位于同级的 [`wirectl`](../wirectl) 仓库，该仓库需要相应访问权限。这里提供
+CLI 入口与库位于 [`wirectl`](https://github.com/k0ngk0ng/wirectl) 仓库，该仓库需要相应访问权限。这里提供
 `wirectl-download` 插件，其他仓库可独立提供 `wirectl-xxx`，不需要修改下载器。
 
 ## 安装与使用
@@ -55,6 +55,32 @@ wirectl download doctor
 仪表盘：方向键 / `j`、`k` 选择任务，`p` 暂停，`r` 恢复，`d` 删除，`q` 退出。
 删除需要 `y` 确认。**删除 ed2k 未完成任务会删除 aMule 的临时分片**；已完成文件保留。
 CLI 的 `remove` 是直接执行，适合脚本调用。
+
+## Shell 补全
+
+生成补全脚本不需要初始化配置或启动 daemon。脚本同时支持 `wirectl download` 和
+`wirectl-download`，补全子命令、选项及固定选项值。
+
+在当前 shell 中加载：
+
+```bash
+# Bash
+source <(wirectl download completion bash)
+```
+
+```zsh
+# Zsh（先初始化补全系统）
+autoload -Uz compinit && compinit
+source <(wirectl download completion zsh)
+```
+
+```fish
+# Fish
+wirectl download completion fish | source
+```
+
+持久启用时，把对应加载命令放入 `~/.bashrc`、`~/.zshrc` 或
+`~/.config/fish/config.fish`；Zsh 已初始化 `compinit` 时无需重复添加初始化命令。
 
 ## 搜索与选择下载
 
@@ -160,6 +186,26 @@ wirectl download --data-dir /srv/wire-download daemon run
 
 `init` 创建权限为 0600 的 `config.json`，不会覆盖已有配置。
 修改配置后重启 daemon。不要手动修改运行中的引擎配置。
+
+`wirectl download doctor` 显示实际状态目录（`State`）和下载目录。查看配置时可用
+以下命令隐藏连接密钥（需要 `jq`）；指定了 `--data-dir` 时改用对应目录：
+
+```sh
+jq 'del(.secret)' "${WIRECTL_DOWNLOAD_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/wirectl/download}/config.json"
+```
+
+当前 `servers` 子命令只支持更新。daemon 运行时，可通过随包安装的 `amulecmd`
+查看已加载的服务器列表（默认安装前缀为 `~/.local`）：
+
+```sh
+(
+  cd "${WIRECTL_DOWNLOAD_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/wirectl/download}" || exit
+  "$HOME/.local/libexec/wirectl-download/bin/amulecmd" \
+    --config-file=../amule/remote.conf --command='Show Servers'
+)
+```
+
+使用自定义安装前缀或状态目录时替换相应路径。
 
 | 配置 | 默认值 / 含义 |
 | --- | --- |
