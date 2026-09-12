@@ -21,13 +21,25 @@ import (
 )
 
 type Job struct {
-	ID      string    `json:"id"`
-	Engine  string    `json:"engine"`
-	Source  string    `json:"source"`
-	Created time.Time `json:"created"`
-	Updated time.Time `json:"updated"`
+	ID         string    `json:"id"`
+	Engine     string    `json:"engine"`
+	Source     string    `json:"source"`
+	Created    time.Time `json:"created"`
+	Updated    time.Time `json:"updated"`
+	MetadataID string    `json:"metadata_id,omitempty"`
 	engine.Item
 }
+
+// metadataRootID identifies the originally submitted aria2 task. aria2
+// persists this ID when a torrent or magnet creates a new child on restart.
+func (j Job) metadataRootID() string {
+	if j.MetadataID != "" {
+		return j.MetadataID
+	}
+	sum := sha256.Sum256([]byte(j.ID + j.Source))
+	return hex.EncodeToString(sum[:8])
+}
+
 type State struct {
 	Version int   `json:"version"`
 	Jobs    []Job `json:"jobs"`
@@ -204,6 +216,12 @@ func (s *Store) Snapshot() ([]Job, map[string]string) {
 func (s *Store) Refresh(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	type finishedResult struct {
+		backend engine.Backend
+		id      string
+		name    string
+	}
+	var finished []finishedResult
 	for name, b := range s.backends {
 		items, err := b.List(ctx)
 		if err != nil {
@@ -217,14 +235,35 @@ func (s *Store) Refresh(ctx context.Context) error {
 		}
 		for i := range s.state.Jobs {
 			j := &s.state.Jobs[i]
-			if j.Engine != name || j.Status == "removed" {
+			if j.Engine != name {
 				continue
 			}
 			item, found := byID[j.Item.ID]
+			if j.MetadataID != "" && j.MetadataID != j.Item.ID {
+				if parent, ok := byID[j.MetadataID]; ok && (parent.Status == "metadata" || parent.Status == "complete" || parent.Status == "removed" || parent.Status == "error") {
+					finished = append(finished, finishedResult{b, parent.ID, name})
+				}
+			}
+			if j.Status == "removed" {
+				if found && (item.Status == "removed" || item.Status == "complete" || item.Status == "error") {
+					finished = append(finished, finishedResult{b, item.ID, name})
+				}
+				continue
+			}
+			if !found && name == "aria2" && j.Status != "complete" && j.Status != "error" {
+				rootID := j.metadataRootID()
+				if parent, ok := byID[rootID]; ok {
+					// A paused metadata request may not have created its child yet.
+					j.MetadataID = rootID
+					item, found = parent, true
+				}
+			}
 			if found {
 				if item.Status == "metadata" {
 					for _, next := range item.FollowedBy {
 						if child, ok := byID[next]; ok {
+							j.MetadataID = item.ID
+							finished = append(finished, finishedResult{b, item.ID, name})
 							item = child
 							break
 						}
@@ -236,13 +275,39 @@ func (s *Store) Refresh(ctx context.Context) error {
 				}
 				j.Item = item
 				j.Updated = time.Now().UTC()
+				if item.Status == "complete" || item.Status == "removed" {
+					finished = append(finished, finishedResult{b, item.ID, name})
+				}
 			} else if j.Status != "complete" && j.Status != "error" {
 				j.Status = "unknown"
 				j.Error = "engine does not report this task; inspect engine logs before retrying"
 			}
 		}
 	}
-	return s.save()
+	// Persist the terminal state and metadata handoff before dropping native
+	// results. Seeding tasks retain their sessions; completed/removed tasks
+	// must not be resurrected by aria2's per-torrent force-save option.
+	if err := s.save(); err != nil {
+		return err
+	}
+	cleaned := make(map[string]bool)
+	for _, result := range finished {
+		key := result.name + ":" + result.id
+		if cleaned[key] {
+			continue
+		}
+		cleaned[key] = true
+		if cleaner, ok := result.backend.(interface {
+			Forget(context.Context, string) error
+		}); ok {
+			if err := cleaner.Forget(ctx, result.id); err != nil {
+				// The database is durable. Report native cleanup failure as
+				// engine health and retry on the next refresh.
+				s.health[result.name] = "clean stopped result: " + err.Error()
+			}
+		}
+	}
+	return nil
 }
 func (s *Store) Action(ctx context.Context, id, action string) error {
 	s.mu.Lock()
@@ -286,6 +351,20 @@ func (s *Store) Action(ctx context.Context, id, action string) error {
 	j.Updated = time.Now().UTC()
 	if err := s.save(); err != nil {
 		return err
+	}
+	if action == "remove" {
+		if cleaner, ok := b.(interface {
+			Forget(context.Context, string) error
+		}); ok {
+			if err := cleaner.Forget(ctx, j.Item.ID); err != nil {
+				return err
+			}
+			if j.MetadataID != "" {
+				if err := cleaner.Forget(ctx, j.MetadataID); err != nil {
+					return err
+				}
+			}
+		}
 	}
 	if persistent, ok := b.(interface{ SaveSession(context.Context) error }); ok {
 		return persistent.SaveSession(ctx)

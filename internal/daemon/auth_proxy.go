@@ -56,7 +56,7 @@ func (p *authProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var source string
 	p.store.mu.Lock()
 	for _, j := range p.store.state.Jobs {
-		if j.Item.ID == parts[1] && j.Engine == "aria2" && j.Status != "removed" {
+		if j.Engine == "aria2" && j.Status != "removed" && (j.Item.ID == parts[1] || j.metadataRootID() == parts[1]) {
 			source = j.Source
 			break
 		}

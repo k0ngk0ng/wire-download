@@ -79,3 +79,41 @@ func TestAuthenticatedProxyRangeAndRedirectIsolation(t *testing.T) {
 		t.Fatal("invalid proxy token accepted")
 	}
 }
+
+func TestAuthenticatedMetadataProxySurvivesChildReplacement(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("sid")
+		if err != nil || cookie.Value != "owned-session" {
+			http.Error(w, "login required", 401)
+			return
+		}
+		_, _ = w.Write([]byte("owned torrent metadata"))
+	}))
+	defer remote.Close()
+	dir := t.TempDir()
+	u, _ := url.Parse(remote.URL)
+	if err := auth.Save(dir, auth.Session{Origin: remote.URL, Cookies: []auth.Cookie{{Name: "sid", Value: "owned-session", Domain: u.Hostname(), Path: "/"}}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, legacy := range []bool{false, true} {
+		job := Job{ID: "logical", Engine: "aria2", Source: remote.URL + "/fixture.torrent", Item: engine.Item{ID: "new-child", Status: "paused"}}
+		parent := job.metadataRootID()
+		if !legacy {
+			job.MetadataID = parent
+		}
+		store := &Store{state: State{Jobs: []Job{job}}}
+		proxy := &authProxy{dir: dir, secret: "fixture-proxy-key", store: store}
+		path := "/fetch/" + parent + "/" + proxy.token(parent)
+		response := httptest.NewRecorder()
+		proxy.ServeHTTP(response, httptest.NewRequest("GET", path, nil))
+		if response.Code != 200 || response.Body.String() != "owned torrent metadata" {
+			t.Fatalf("legacy=%v metadata unavailable after handoff: %d %s", legacy, response.Code, response.Body.String())
+		}
+		store.state.Jobs[0].Status = "removed"
+		response = httptest.NewRecorder()
+		proxy.ServeHTTP(response, httptest.NewRequest("GET", path, nil))
+		if response.Code != 404 {
+			t.Fatalf("removed task still available: %d", response.Code)
+		}
+	}
+}

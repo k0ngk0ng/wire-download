@@ -189,7 +189,7 @@ WIRECTL_TEST_ARIA2=/absolute/path/to/aria2c make test
 不配置真实引擎时，相关测试会明确 skip，不能据此宣称协议已完成实测。
 发行包必须包含所有引擎，不能把仅 Go 二进制的开发构建当作自包含发行包。
 
-在目标系统上执行 `VERSION=0.1.2 make release` 构建完整候选包。
+在目标系统上执行 `VERSION=0.1.3 make release` 构建完整候选包。
 构建机需要 Go、Python 3、C/C++ 工具链、make、curl、tar；Linux 还需要
 OpenSSL/zlib 开发文件和 patchelf。引擎源代码下载均校验固定 SHA256。
 `dist/` 生成安装归档、单独的对应源码归档和校验和；终端用户只需安装归档。
@@ -199,11 +199,14 @@ OpenSSL/zlib 开发文件和 patchelf。引擎源代码下载均校验固定 SHA
 
 ```sh
 python3 scripts/test-install.py /absolute/path/to/test-install-prefix
+python3 scripts/test-tui.py /absolute/path/to/test-install-prefix
+python3 scripts/test-bt-recovery.py /absolute/path/to/test-install-prefix
 ```
 
-这会在精简 PATH 下启动安装包中的引擎，验证真实 HTTP 下载、暂停、
-daemon 重启后续传、内容校验和完成文件保留。ED2K 实际传输及各目标平台的
-验证需单独完成，不能用这个 HTTP 验收替代。
+这些验收在精简 PATH 下启动安装包中的引擎，验证 HTTP 登录下载和重启续传、
+真实终端进度与键盘控制，以及本地 torrent、HTTP torrent 和 magnet 的暂停重启恢复。
+BT 恢复保留用户看到的任务 ID；引擎内部的元数据子任务 ID 可以变化。
+ED2K 实际传输使用 `scripts/test-ed2k.py`；Release 工作流在四个目标平台运行全部验收。
 
 ## 第三方组件
 

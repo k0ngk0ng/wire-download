@@ -7,11 +7,11 @@ Docker 镜像只用于构建和测试，终端用户安装包不需要 Docker。
 
 ```sh
 mkdir -p .cache/linux-validation
-tar -xzf dist/wire-download-0.1.2-sources.tar.gz -C .cache/linux-validation
+tar -xzf dist/wire-download-0.1.3-sources.tar.gz -C .cache/linux-validation
 docker build -t wirectl-download-build:go1.26.2-bookworm scripts/linux
 docker run --rm \
-  --mount "type=bind,src=$PWD/.cache/linux-validation/wire-download-0.1.2-sources,dst=/work" \
-  -e VERSION=0.1.2 \
+  --mount "type=bind,src=$PWD/.cache/linux-validation/wire-download-0.1.3-sources,dst=/work" \
+  -e VERSION=0.1.3 \
   wirectl-download-build:go1.26.2-bookworm
 ```
 
