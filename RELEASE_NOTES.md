@@ -1,4 +1,4 @@
-# wirectl download 0.1.1
+# wirectl download 0.1.2
 
 通过 `wirectl download` 管理 HTTP/HTTPS、torrent、magnet 和 ed2k 下载。独立 daemon 持续下载，终端仪表盘显示进度、速度和任务状态，支持暂停、恢复及重启恢复。
 

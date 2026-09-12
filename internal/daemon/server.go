@@ -42,6 +42,46 @@ func UpdateServers(ctx context.Context, dir string) error {
 	}
 	return BootstrapServers(ctx, dir, c.ServerListURLs, true)
 }
+
+const engineReadyRetry = 250 * time.Millisecond
+
+// waitForEngines waits for both backends to answer successfully. A listening
+// TCP/EC port only proves that the child accepted a socket; aMule can still
+// return an empty reply while its EC service is initializing. Refresh records
+// backend failures in health and returns persistence failures directly, so
+// only the former are retried here.
+func waitForEngines(ctx context.Context, store *Store) error {
+	ticker := time.NewTicker(engineReadyRetry)
+	defer ticker.Stop()
+	var failedName, failedStatus string
+	for {
+		if err := store.Refresh(ctx); err != nil {
+			return err
+		}
+		_, health := store.Snapshot()
+		ready := true
+		for _, name := range []string{"aria2", "amule"} {
+			status, ok := health[name]
+			if !ok || status != "ok" {
+				ready = false
+				failedName, failedStatus = name, status
+				if !ok {
+					failedStatus = "not reported"
+				}
+				break
+			}
+		}
+		if ready {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%s readiness failed: %s", failedName, failedStatus)
+		case <-ticker.C:
+		}
+	}
+}
+
 func Run(ctx context.Context, dir string, c config.Config) error {
 	lock, err := acquire(dir)
 	if err != nil {
@@ -64,27 +104,40 @@ func Run(ctx context.Context, dir string, c config.Config) error {
 	}
 	ab := engine.NewAria2(c.Aria2Port, c.Secret)
 	eb := engine.NewAMule(c.AMulecmdBinary, filepath.Join(dir, "amule"), c.Secret, c.AMulePort)
-	defer ab.Close()
-	defer eb.Close()
+	var aria, amule *process
+	var closeProxy func()
+	// Keep cleanup available as soon as the backends are created. The backend
+	// session saves must run before their child processes are stopped, while
+	// the nil checks also cover failures during startup.
+	defer func() {
+		_ = ab.Close()
+		_ = eb.Close()
+		if aria != nil {
+			aria.stop()
+		}
+		if amule != nil {
+			amule.stop()
+		}
+		if closeProxy != nil {
+			closeProxy()
+		}
+	}()
 	store, err := NewStore(dir, map[string]engine.Backend{"aria2": ab, "amule": eb})
 	if err != nil {
 		return err
 	}
-	closeProxy, err := startAuthProxy(ctx, dir, c, store)
+	closeProxy, err = startAuthProxy(ctx, dir, c, store)
 	if err != nil {
 		return err
 	}
-	defer closeProxy()
-	aria, err := startProcess(c.Aria2Binary, []string{"--conf-path=" + filepath.Join(dir, "aria2", "aria2.conf")}, filepath.Join(dir, "logs", "aria2.log"))
+	aria, err = startProcess(c.Aria2Binary, []string{"--conf-path=" + filepath.Join(dir, "aria2", "aria2.conf")}, filepath.Join(dir, "logs", "aria2.log"))
 	if err != nil {
 		return err
 	}
-	defer aria.stop()
-	amule, err := startProcess(c.AMuledBinary, []string{"--config-dir=" + filepath.Join(dir, "amule")}, filepath.Join(dir, "logs", "amuled.log"))
+	amule, err = startProcess(c.AMuledBinary, []string{"--config-dir=" + filepath.Join(dir, "amule")}, filepath.Join(dir, "logs", "amuled.log"))
 	if err != nil {
 		return err
 	}
-	defer amule.stop()
 	ready, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	for _, p := range []struct {
@@ -95,14 +148,8 @@ func Run(ctx context.Context, dir string, c config.Config) error {
 			return err
 		}
 	}
-	if err = store.Refresh(ready); err != nil {
+	if err = waitForEngines(ready, store); err != nil {
 		return err
-	}
-	_, health := store.Snapshot()
-	for name, status := range health {
-		if status != "ok" {
-			return fmt.Errorf("%s readiness failed: %s", name, status)
-		}
 	}
 	// aMule needs an explicit connect command after startup.
 	if err = eb.Connect(ready); err != nil {
@@ -162,6 +209,16 @@ loop:
 	shutdown, cancelShutdown := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancelShutdown()
 	_ = srv.Shutdown(shutdown)
+	// The polling ticker may have last observed a task just before it finished.
+	// Refresh once more before stopping the engines so a graceful stop records
+	// terminal engine state in jobs.json. This deliberately relies on the
+	// engine status returned by RPC/EC, never on the presence of a downloaded
+	// file on disk.
+	flushCtx, cancelFlush := context.WithTimeout(context.Background(), 20*time.Second)
+	if err := store.Refresh(flushCtx); err != nil {
+		log.Printf("final task refresh: %v", err)
+	}
+	cancelFlush()
 	return runErr
 }
 func Handler(store *Store, stop context.CancelFunc) http.Handler {

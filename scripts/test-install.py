@@ -48,10 +48,12 @@ def wait_for(predicate, timeout=45):
 
 
 payload = b'wirectl offline installation fixture\n' * 524288
+requests = []
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        requests.append(self.path)
         if self.path == '/private.bin' and self.headers.get('Cookie') != 'session=owned-browser-session':
             self.send_response(401)
             self.send_header('Content-Length', '0')
@@ -129,6 +131,17 @@ try:
     cli('resume', task_id)
     wait_for(lambda js: js[0]['status'] == 'complete')
     assert hashlib.sha256((downloads / 'fixture.bin').read_bytes()).digest() == hashlib.sha256(payload).digest()
+    before_restart = len(requests)
+    cli('daemon', 'stop')
+    started = False
+    cli('daemon', 'start')
+    started = True
+    time.sleep(3)  # Include a full refresh after engine session recovery.
+    snapshot = jobs()
+    assert next(j for j in snapshot if j['id'] == task_id)['status'] == 'complete', snapshot
+    assert len(requests) == before_restart, 'Completed HTTP task was requested again after restart'
+    assert (downloads / 'fixture.bin').read_bytes() == payload
+    print('PASS completed HTTP task survives restart without requeue or file changes', flush=True)
     cli('remove', task_id)
     assert (downloads / 'fixture.bin').is_file()
     print('PASS resumed download matches bytes; removal retains completed file', flush=True)
@@ -151,6 +164,18 @@ try:
     assert (downloads / 'private.bin').read_bytes() == payload
     assert 'owned-browser-session' not in (state / 'aria2/session.txt').read_text()
     assert 'owned-browser-session' not in (state / 'jobs.json').read_text()
+    before_restart = len(requests)
+    cli('daemon', 'stop')
+    started = False
+    cli('daemon', 'start')
+    started = True
+    time.sleep(3)
+    snapshot = jobs()
+    assert next(j for j in snapshot if j['id'] == auth_id)['status'] == 'complete', snapshot
+    assert next(j for j in snapshot if j['id'] == task_id)['status'] == 'removed', snapshot
+    assert len(requests) == before_restart, 'Completed or removed task was requested again'
+    assert (downloads / 'private.bin').read_bytes() == payload
+    print('PASS completed authenticated and removed tasks stay settled after restart', flush=True)
     cli('logout', session['origin'])
     assert not list((state / 'auth').glob('*.json'))
     print('PASS authenticated HTTP, restart/resume, private cookie storage and logout', flush=True)
