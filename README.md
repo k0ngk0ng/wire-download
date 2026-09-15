@@ -9,6 +9,47 @@ CLI 入口与库位于 [`wirectl`](https://github.com/k0ngk0ng/wirectl) 仓库�
 
 ## 安装与使用
 
+### Homebrew
+
+Apple Silicon macOS 和 Linux amd64/arm64 可以直接安装：
+
+```sh
+brew install k0ngk0ng/tap/wire-download
+wirectl download init
+wirectl download daemon start
+```
+
+Formula 自动安装 `wirectl` 主程序，并附带 aria2/aMule 引擎；可以与
+`wire-connect` 一起安装。macOS 要求 13+，Linux 要求 glibc 2.36+。
+首次安装后运行 `init`；已有配置时跳过，继续使用原状态目录。
+
+升级前停止 daemon，升级后重新启动：
+
+```sh
+wirectl download daemon stop
+brew update
+brew upgrade k0ngk0ng/tap/wirectl k0ngk0ng/tap/wire-download
+wirectl download daemon start
+```
+
+也可以交给 Homebrew 管理后台服务：首次 `init` 后用
+`brew services start k0ngk0ng/tap/wire-download` 启动。使用这种方式时，升级前后分别用
+`brew services stop k0ngk0ng/tap/wire-download` 和
+`brew services start k0ngk0ng/tap/wire-download`，不要再同时运行 `daemon start`。
+
+如果原来手动安装在 `~/.local/bin`，先用 `type -a wirectl wirectl-download` 检查路径，
+把 Homebrew 的 `bin` 放在 `PATH` 前面；原下载文件和状态目录继续保留。
+可用 `"$(brew --prefix)/bin/wirectl" download version` 明确检查 Homebrew 安装的版本。
+
+Bash、Zsh 和 Fish 的 `wirectl-download` 补全安装到 Homebrew 的标准目录，
+不会覆盖 `wire-connect` 的补全文件。启用 Homebrew 的 shell 补全后即可使用。
+`wirectl download` 的手动加载方式见下方「Shell 补全」。
+
+[Homebrew Tap](https://github.com/k0ngk0ng/homebrew-tap) 每小时检查官方稳定版 Release，
+核对 GitHub asset digest 和独立 `SHA256SUMS`，通过三个平台的安装测试后更新 Formula。
+
+### 手动安装发行包
+
 每个发行归档都是一个自包含的 macOS 或 Linux 目标包，包含主入口、下载插件、aria2
 和无 GUI 的 aMule 引擎；不需要另装引擎。安装脚本不访问网络，也不调用系统包管理器。
 发布工作流分别构建 `darwin-arm64`、`linux-arm64` 和 `linux-amd64`，选择与你的系统和
