@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -285,7 +286,15 @@ func defaultAMuleCommandExecutor(ctx context.Context, binary string, args ...str
 	runCtx, cancel := context.WithTimeout(ctx, defaultAMuleCommandTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(runCtx, binary, args...)
-	cmd.Env = append(os.Environ(), "LC_ALL=C", "LANG=C")
+	// wxWidgets drops whole output lines containing non-ASCII filenames
+	// under the C locale. Keep English messages for parsing, with UTF-8 for
+	// filenames. macOS provides en_US.UTF-8; supported Linux builds provide
+	// glibc's C.UTF-8 even when no additional locales have been generated.
+	locale := "C.UTF-8"
+	if runtime.GOOS == "darwin" {
+		locale = "en_US.UTF-8"
+	}
+	cmd.Env = append(os.Environ(), "LC_ALL="+locale, "LANG="+locale)
 	if dir, ok := runCtx.Value(amuleCommandDirKey{}).(string); ok && dir != "" {
 		cmd.Dir = dir
 	}
@@ -368,16 +377,16 @@ func (b *cappedBuffer) Write(p []byte) (int, error) {
 }
 
 var (
-	amuleANSIRe       = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
-	amuleHeaderRe     = regexp.MustCompile(`(?i)^([0-9a-f]{32})[ \t]+(.*)$`)
-	amuleDetailRe     = regexp.MustCompile(`(?i)\[\s*([0-9]+(?:[.,][0-9]+)?)\s*%\s*\]\s*(.*)$`)
-	amuleSourcesRe    = regexp.MustCompile(`^\s*-?[0-9]+\s*/\s*-?[0-9]+\s+(?:\+\s*[0-9]+\s+)?(?:\(\s*[0-9]+\s*\)\s*-\s*|[-]\s*)?(.*)$`)
-	amuleSpeedRe      = regexp.MustCompile(`(?i)([0-9]+(?:[.,][0-9]+)?)\s*([kmgt]?i?b)(?:\s*/\s*(?:s|sec))?\s*$`)
-	amuleLinkHashRe   = regexp.MustCompile(`(?i)\|h=([0-9a-f]{32})(?:\||$)`)
-	amuleED2KFileRe   = regexp.MustCompile(`(?i)^ed2k://(?:%7c|\|)file(?:%7c|\|)[^|%]*(?:%7c|\|)[0-9]+(?:%7c|\|)([0-9a-f]{32})(?:%7c|\|)`)
-	amuleMagnetHashRe = regexp.MustCompile(`(?i)urn:ed2k:([0-9a-f]{32})`)
-	amuleFailureRe    = regexp.MustCompile(`(?is)(request\s+failed\b[^\r\n]*|connection\s+failed\b[^\r\n]*|fatal\s+error\b[^\r\n]*|cannot\s+connect\b[^\r\n]*|unknown\s+command\b[^\r\n]*|error\s+processing\s+command\b[^\r\n]*)`)
-	amuleSimpleIDRe   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
+	amuleANSIRe         = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
+	amuleHeaderRe       = regexp.MustCompile(`(?i)^([0-9a-f]{32})[ \t]+(.*)$`)
+	amuleDetailRe       = regexp.MustCompile(`(?i)\[\s*([0-9]+(?:[.,][0-9]+)?)\s*%\s*\]\s*(.*)$`)
+	amuleSourcesRe      = regexp.MustCompile(`^\s*-?[0-9]+\s*/\s*-?[0-9]+\s+(?:\+\s*[0-9]+\s+)?(?:\(\s*[0-9]+\s*\)\s*-\s*|[-]\s*)?(.*)$`)
+	amuleSpeedRe        = regexp.MustCompile(`(?i)([0-9]+(?:[.,][0-9]+)?)\s*([kmgt]?i?b)(?:\s*/\s*(?:s|sec))?\s*$`)
+	amuleLinkHashRe     = regexp.MustCompile(`(?i)(?:\||%7c)h(?:=|%3d)([0-9a-f]{32})(?:\||%7c|$)`)
+	amuleED2KSizeHashRe = regexp.MustCompile(`(?i)(?:\||%7c)[0-9]+(?:\||%7c)([0-9a-f]{32})(?:\||%7c|$)`)
+	amuleMagnetHashRe   = regexp.MustCompile(`(?i)urn:ed2k:([0-9a-f]{32})`)
+	amuleFailureRe      = regexp.MustCompile(`(?is)(request\s+failed\b[^\r\n]*|connection\s+failed\b[^\r\n]*|fatal\s+error\b[^\r\n]*|cannot\s+connect\b[^\r\n]*|unknown\s+command\b[^\r\n]*|error\s+processing\s+command\b[^\r\n]*)`)
+	amuleSimpleIDRe     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
 )
 
 // parseAMuleDownloads parses both the current TextClient output and the same
@@ -513,16 +522,77 @@ func parseAMuleSpeed(s string) int64 {
 }
 
 func amuleLinkID(link string) string {
-	if match := amuleLinkHashRe.FindStringSubmatch(link); match != nil {
-		return strings.ToLower(match[1])
+	// Prefer the file hash.  An eD2k file link may also carry one or more
+	// hash extensions (|h=...), but those identify the hash set rather than
+	// replacing the file's stable queue identity.
+	if id := amuleED2KFileID(link); id != "" {
+		return id
 	}
-	if match := amuleED2KFileRe.FindStringSubmatch(link); match != nil {
+	if match := amuleLinkHashRe.FindStringSubmatch(link); match != nil {
 		return strings.ToLower(match[1])
 	}
 	if match := amuleMagnetHashRe.FindStringSubmatch(link); match != nil {
 		return strings.ToLower(match[1])
 	}
 	return ""
+}
+
+func amuleED2KFileID(link string) string {
+	const scheme = "ed2k://"
+	if len(link) < len(scheme) || !strings.EqualFold(link[:len(scheme)], scheme) {
+		return ""
+	}
+
+	body := link[len(scheme):]
+	// Raw separators are unambiguous: a percent-encoded vertical bar in the
+	// filename remains part of that field and cannot shift the hash index.
+	if strings.HasPrefix(body, "|") {
+		fields := strings.Split(body, "|")
+		if len(fields) >= 5 && strings.EqualFold(fields[1], "file") {
+			if id := normalizeAMuleHash(fields[4]); id != "" {
+				return id
+			}
+		}
+	}
+
+	// Some producers encode every structural separator as %7C.  Decode only
+	// the separators needed to recognize the layout; decoding the whole link
+	// would turn a filename's encoded pipe into a false field boundary.
+	rest, ok := consumeAMuleSeparator(body)
+	if !ok || len(rest) < len("file") || !strings.EqualFold(rest[:len("file")], "file") {
+		return ""
+	}
+	rest = rest[len("file"):]
+	rest, ok = consumeAMuleSeparator(rest)
+	if !ok {
+		return ""
+	}
+	if match := amuleED2KSizeHashRe.FindStringSubmatch(rest); match != nil {
+		return strings.ToLower(match[1])
+	}
+	return ""
+}
+
+func consumeAMuleSeparator(value string) (string, bool) {
+	if strings.HasPrefix(value, "|") {
+		return value[1:], true
+	}
+	if len(value) >= 3 && strings.EqualFold(value[:3], "%7c") {
+		return value[3:], true
+	}
+	return "", false
+}
+
+func normalizeAMuleHash(value string) string {
+	if len(value) != 32 {
+		return ""
+	}
+	for _, r := range value {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return ""
+		}
+	}
+	return strings.ToLower(value)
 }
 
 func amuleCommandFailure(raw []byte) string {

@@ -250,6 +250,15 @@ func (s *Store) Refresh(ctx context.Context) error {
 				}
 				continue
 			}
+			// Older aMule adapters saved the entire link as the engine ID
+			// when the filename contained percent escapes. Recover only that
+			// legacy identity, and only when the engine reports its file hash.
+			if !found && name == "amule" && j.Item.ID == j.Source {
+				if kind, err := ValidateSource(j.Source); err == nil && kind == "amule" {
+					hash := strings.ToLower(strings.Split(j.Source, "|")[4])
+					item, found = byID[hash]
+				}
+			}
 			if !found && name == "aria2" && j.Status != "complete" && j.Status != "error" {
 				rootID := j.metadataRootID()
 				if parent, ok := byID[rootID]; ok {

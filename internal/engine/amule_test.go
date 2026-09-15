@@ -172,6 +172,56 @@ func TestAMuleAddReturnsED2KHash(t *testing.T) {
 	}
 }
 
+func TestAMuleLinkIDHandlesEncodedED2KLinks(t *testing.T) {
+	const fileHash = "0123456789abcdef0123456789abcdef"
+	const extensionHash = "abcdefabcdefabcdefabcdefabcdefab"
+
+	tests := []struct {
+		name string
+		link string
+		want string
+	}{
+		{
+			name: "plain",
+			link: "ed2k://|file|Fedora.iso|123|" + fileHash + "|/",
+			want: fileHash,
+		},
+		{
+			name: "percent encoded filename",
+			link: "ed2k://|file|%E4%B8%AD%E6%96%87.iso|123|" + fileHash + "|/",
+			want: fileHash,
+		},
+		{
+			name: "fully encoded separators",
+			link: "ed2k://%7Cfile%7CFedora.iso%7C123%7C" + fileHash + "%7C/",
+			want: fileHash,
+		},
+		{
+			name: "encoded pipe in filename",
+			link: "ed2k://|file|part%7Cname.iso|123|" + fileHash + "|/",
+			want: fileHash,
+		},
+		{
+			name: "file hash takes precedence over extension",
+			link: "ed2k://|file|Fedora.iso|123|" + fileHash + "|h=" + extensionHash + "|/",
+			want: fileHash,
+		},
+		{
+			name: "encoded hash extension fallback",
+			link: "ed2k://|server|127.0.0.1|4662%7Ch%3D" + fileHash + "%7C/",
+			want: fileHash,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := amuleLinkID(tt.link); got != tt.want {
+				t.Errorf("amuleLinkID(%q) = %q, want %q", tt.link, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestAMuleOperationErrorsAreDetectedAndRedacted(t *testing.T) {
 	a := NewAMule("amulecmd", "", "top-secret")
 	a.executor = func(_ context.Context, _ string, _ ...string) ([]byte, error) {
