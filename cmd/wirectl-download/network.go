@@ -7,6 +7,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/k0ngk0ng/wire-download/internal/config"
@@ -122,8 +124,18 @@ func containsString(values []string, want string) bool {
 }
 
 func emuleCommand(ctx context.Context, dir string, args []string) error {
-	if len(args) != 2 || args[0] != "servers" || args[1] != "update" {
-		return errors.New("usage: wirectl download emule servers update")
+	if len(args) != 2 || args[0] != "servers" || (args[1] != "update" && args[1] != "list") {
+		return errors.New("usage: wirectl download emule servers list|update")
 	}
-	return daemon.UpdateServers(ctx, dir)
+	if args[1] == "update" {
+		return daemon.UpdateServers(ctx, dir)
+	}
+	c, err := config.Load(dir)
+	if err != nil {
+		return err
+	}
+	remote := filepath.Join(dir, "amule", "remote.conf")
+	cmd := exec.CommandContext(ctx, c.AMulecmdBinary, "--config-file="+remote, "--command=Show Servers")
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	return cmd.Run()
 }
