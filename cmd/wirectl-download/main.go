@@ -180,8 +180,6 @@ func run(ctx context.Context, args []string) error {
 		}
 		return nil
 	}}
-	app.Commands["emule"] = cli.Command{Summary: "Manage eMule servers", Run: func(ctx context.Context, args []string) error { return emuleCommand(ctx, *dir, args) }}
-	app.Commands["bt"] = cli.Command{Summary: "Manage BitTorrent trackers", Run: func(ctx context.Context, args []string) error { return btCommand(ctx, *dir, args) }}
 	return app.Run(ctx, args)
 }
 func daemonCommand(ctx context.Context, dir string, c *client.Client, args []string) error {
