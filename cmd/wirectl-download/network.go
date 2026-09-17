@@ -7,12 +7,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/k0ngk0ng/wire-download/internal/config"
 	"github.com/k0ngk0ng/wire-download/internal/daemon"
+	"github.com/k0ngk0ng/wire-download/internal/engine"
 )
 
 func btCommand(ctx context.Context, dir string, args []string) error {
@@ -134,8 +134,12 @@ func emuleCommand(ctx context.Context, dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	remote := filepath.Join(dir, "amule", "remote.conf")
-	cmd := exec.CommandContext(ctx, c.AMulecmdBinary, "--config-file="+remote, "--command=Show Servers")
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	return cmd.Run()
+	amule := engine.NewAMule(c.AMulecmdBinary, filepath.Join(dir, "amule"), c.Secret, c.AMulePort)
+	defer amule.Close()
+	output, err := amule.ShowServers(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = os.Stdout.Write(output)
+	return err
 }

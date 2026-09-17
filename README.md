@@ -235,18 +235,12 @@ wirectl download --data-dir /srv/wire-download daemon run
 jq 'del(.secret)' "${WIRECTL_DOWNLOAD_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/wirectl/download}/config.json"
 ```
 
-当前 `servers` 子命令只支持更新。daemon 运行时，可通过随包安装的 `amulecmd`
-查看已加载的服务器列表（默认安装前缀为 `~/.local`）：
+daemon 运行时，可以查看或更新 eMule 服务器列表：
 
 ```sh
-(
-  cd "${WIRECTL_DOWNLOAD_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/wirectl/download}" || exit
-  "$HOME/.local/libexec/wirectl-download/bin/amulecmd" \
-    --config-file=../amule/remote.conf --command='Show Servers'
-)
+wirectl download emule servers list
+wirectl download emule servers update
 ```
-
-使用自定义安装前缀或状态目录时替换相应路径。
 
 | 配置 | 默认值 / 含义 |
 | --- | --- |
@@ -273,7 +267,7 @@ eMule 默认启用 ED2K 和 Kad。初次启动通过 HTTPS 获取 eMule Security
 
 ```sh
 wirectl download daemon stop
-wirectl download servers update
+wirectl download emule servers update
 wirectl download daemon start
 ```
 
@@ -381,4 +375,4 @@ wirectl download bt trackers add udp://tracker.example.org:1337/announce
 wirectl download bt trackers remove udp://tracker.example.org:1337/announce
 ```
 
-修改后重启 daemon 生效。eMule 服务器使用 `wirectl download emule servers update`。
+修改后重启 daemon 生效。

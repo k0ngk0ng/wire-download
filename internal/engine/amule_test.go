@@ -139,6 +139,31 @@ func TestAMuleCommandArgumentsAndConnect(t *testing.T) {
 	}
 }
 
+func TestAMuleShowServersReturnsRawOutput(t *testing.T) {
+	const wantOutput = "This is aMulecmd 2.3.3\n > 127.0.0.1:4662  Example Server\n"
+	a := NewAMule("amulecmd", "", "secret")
+	var command string
+	a.executor = func(_ context.Context, _ string, args ...string) ([]byte, error) {
+		for _, arg := range args {
+			if strings.HasPrefix(arg, "--command=") {
+				command = strings.TrimPrefix(arg, "--command=")
+			}
+		}
+		return []byte(wantOutput), nil
+	}
+
+	output, err := a.ShowServers(context.Background())
+	if err != nil {
+		t.Fatalf("ShowServers() error = %v", err)
+	}
+	if string(output) != wantOutput {
+		t.Errorf("ShowServers() output = %q, want %q", output, wantOutput)
+	}
+	if command != "show servers" {
+		t.Errorf("command = %q, want %q", command, "show servers")
+	}
+}
+
 func TestAMuleAddReturnsED2KHash(t *testing.T) {
 	const hash = "0123456789abcdef0123456789abcdef"
 	a := NewAMule("amulecmd", "", "secret")

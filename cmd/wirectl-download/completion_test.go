@@ -133,6 +133,7 @@ func TestBashCompletionContexts(t *testing.T) {
 		{name: "result type enum", words: []string{"wirectl-download", "search", "--type", "to"}, at: 3, want: "torrent"},
 		{name: "ed2k mode enum", words: []string{"wirectl-download", "search", "--ed2k-mode", "s"}, at: 3, want: "server"},
 		{name: "nested source action", words: []string{"wirectl-download", "search", "sources", "d"}, at: 3, want: "disable"},
+		{name: "eMule server action", words: []string{"wirectl-download", "emule", "servers", "l"}, at: 3, want: "list"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

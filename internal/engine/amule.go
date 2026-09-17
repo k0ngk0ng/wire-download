@@ -94,6 +94,14 @@ func (a *AMule) Connect(ctx context.Context) error {
 	return err
 }
 
+// ShowServers returns the text produced by amulecmd's `Show Servers`
+// command.  The response is intentionally kept as raw bytes so the CLI can
+// preserve aMule's server names and table formatting exactly as displayed by
+// the text client.
+func (a *AMule) ShowServers(ctx context.Context) ([]byte, error) {
+	return a.execute(ctx, "show servers")
+}
+
 // Add queues an eD2k or magnet link.  amulecmd acknowledges a successful add
 // with only "Operation was successful." and does not return the newly created
 // queue item's id.  File links contain the eD2k hash, so that hash is returned
