@@ -186,7 +186,7 @@ _wirectl_download_completion() {
         if [[ "$cur" == -* ]]; then
             _wirectl_download_values "$cur" "--data-dir --help -h"
         else
-            _wirectl_download_values "$cur" "search add login logout init version list watch pause resume remove daemon doctor servers completion"
+            _wirectl_download_values "$cur" "search add login logout init version list watch pause resume remove daemon doctor bt emule servers completion"
         fi
         return
     fi
@@ -276,6 +276,22 @@ _wirectl_download_completion() {
                 else
                     _wirectl_download_values "$cur" "update"
                 fi
+            fi
+            return
+            ;;
+        bt)
+            if [[ -z "$nested" ]]; then
+                [[ "$cur" == -* ]] && _wirectl_download_values "$cur" "--help -h" || _wirectl_download_values "$cur" "trackers"
+            elif [[ "$nested" == "trackers" && "$cur" != -* ]]; then
+                _wirectl_download_values "$cur" "list add remove"
+            fi
+            return
+            ;;
+        emule)
+            if [[ -z "$nested" ]]; then
+                [[ "$cur" == -* ]] && _wirectl_download_values "$cur" "--help -h" || _wirectl_download_values "$cur" "servers"
+            elif [[ "$nested" == "servers" && "$cur" != -* ]]; then
+                _wirectl_download_values "$cur" "update"
             fi
             return
             ;;
@@ -415,7 +431,7 @@ _wirectl_download_completion() {
         if [[ "$cur" == -* ]]; then
             _wirectl_download_values "$cur" --data-dir --help -h
         else
-            _wirectl_download_values "$cur" search add login logout init version list watch pause resume remove daemon doctor servers completion
+            _wirectl_download_values "$cur" search add login logout init version list watch pause resume remove daemon doctor bt emule servers completion
         fi
         return
     fi
@@ -498,6 +514,30 @@ _wirectl_download_completion() {
                 else
                     _wirectl_download_values "$cur" update
                 fi
+            fi
+            return
+            ;;
+        bt)
+            if [[ -z "$nested" ]]; then
+                if [[ "$cur" == -* ]]; then
+                    _wirectl_download_values "$cur" --help -h
+                else
+                    _wirectl_download_values "$cur" trackers
+                fi
+            elif [[ "$nested" == trackers && "$cur" != -* ]]; then
+                _wirectl_download_values "$cur" list add remove
+            fi
+            return
+            ;;
+        emule)
+            if [[ -z "$nested" ]]; then
+                if [[ "$cur" == -* ]]; then
+                    _wirectl_download_values "$cur" --help -h
+                else
+                    _wirectl_download_values "$cur" servers
+                fi
+            elif [[ "$nested" == servers && "$cur" != -* ]]; then
+                _wirectl_download_values "$cur" update
             fi
             return
             ;;
@@ -592,7 +632,7 @@ function __wirectl_download_complete
         if string match -q -- '-*' "$current"
             __wirectl_download_values --data-dir --help -h
         else
-            __wirectl_download_values search add login logout init version list watch pause resume remove daemon doctor servers completion
+            __wirectl_download_values search add login logout init version list watch pause resume remove daemon doctor bt emule servers completion
         end
         return
     end
@@ -663,6 +703,28 @@ function __wirectl_download_complete
                 else
                     __wirectl_download_values update
                 end
+            end
+            return
+        case bt
+            if test -z "$nested"
+                if string match -q -- '-*' "$current"
+                    __wirectl_download_values --help -h
+                else
+                    __wirectl_download_values trackers
+                end
+            else if test "$nested" = trackers; and not string match -q -- '-*' "$current"
+                __wirectl_download_values list add remove
+            end
+            return
+        case emule
+            if test -z "$nested"
+                if string match -q -- '-*' "$current"
+                    __wirectl_download_values --help -h
+                else
+                    __wirectl_download_values servers
+                end
+            else if test "$nested" = servers; and not string match -q -- '-*' "$current"
+                __wirectl_download_values update
             end
             return
         case completion
