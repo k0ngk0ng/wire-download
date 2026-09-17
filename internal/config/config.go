@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 type Config struct {
@@ -138,6 +141,29 @@ func (c Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+// ValidateTracker checks the URL forms accepted by aria2's bt-tracker
+// option.  Trackers are persisted in config.json and later joined into a
+// comma-separated engine option, so control characters and empty hosts are
+// rejected before they reach the generated aria2 configuration.
+func ValidateTracker(raw string) error {
+	if len(raw) == 0 || len(raw) > 4096 {
+		return errors.New("tracker URL must be 1–4096 bytes")
+	}
+	if !utf8.ValidString(raw) || strings.IndexFunc(raw, unicode.IsControl) >= 0 {
+		return errors.New("tracker URL contains invalid characters")
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" {
+		return errors.New("tracker URL must include a host")
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https", "udp":
+		return nil
+	default:
+		return errors.New("tracker URL must use http, https, or udp")
+	}
 }
 
 func RateBytes(value string) (int64, error) {

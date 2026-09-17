@@ -372,3 +372,13 @@ macOS arm64 和 Linux amd64、arm64 安装包，并运行真实协议及安装�
 
 Linux 发布构建需要启用 Debian `deb-src` 软件源，以下载随包运行库的精确对应源码；
 工作流和 `scripts/linux/Dockerfile` 已配置。源码归档供审查和重建使用，不是安装依赖。
+
+### BitTorrent tracker 管理
+
+```sh
+wirectl download bt trackers list
+wirectl download bt trackers add udp://tracker.example.org:1337/announce
+wirectl download bt trackers remove udp://tracker.example.org:1337/announce
+```
+
+修改后重启 daemon 生效。eMule 服务器使用 `wirectl download emule servers update`。

@@ -95,6 +95,8 @@ func run(ctx context.Context, args []string) error {
 	app := cli.App{Name: "wirectl download", Description: "HTTP(S) / ed2k / BitTorrent / magnet downloads; pass a URL or torrent file directly\nGlobal option: --data-dir <path> (before the subcommand), or WIRECTL_DOWNLOAD_HOME", Default: download, Commands: map[string]cli.Command{}}
 	app.Commands["completion"] = cli.Command{Summary: "Generate shell completion: bash | zsh | fish", Run: func(_ context.Context, args []string) error { return completionCommand(args) }}
 	app.Commands["search"] = cli.Command{Summary: "Search eMule, torrent and magnet indexes with live results", Run: func(ctx context.Context, args []string) error { return searchCommand(ctx, c, args) }}
+	app.Commands["bt"] = cli.Command{Summary: "Manage BitTorrent trackers", Run: func(ctx context.Context, args []string) error { return btCommand(ctx, *dir, args) }}
+	app.Commands["emule"] = cli.Command{Summary: "Manage eMule server lists", Run: func(ctx context.Context, args []string) error { return emuleCommand(ctx, *dir, args) }}
 	app.Commands["add"] = cli.Command{Summary: "Enqueue links or torrent files", Run: download}
 	app.Commands["login"] = cli.Command{Summary: "Browser login for HTTP(S), optionally --remote user@server", Run: func(ctx context.Context, args []string) error { return loginCommand(ctx, *dir, args) }}
 	app.Commands["logout"] = cli.Command{Summary: "Forget a website's saved download session", Run: func(ctx context.Context, args []string) error {
@@ -178,12 +180,8 @@ func run(ctx context.Context, args []string) error {
 		}
 		return nil
 	}}
-	app.Commands["servers"] = cli.Command{Summary: "Update eMule server list while daemon is stopped", Run: func(ctx context.Context, args []string) error {
-		if len(args) != 1 || args[0] != "update" {
-			return errors.New("usage: wirectl download servers update")
-		}
-		return daemon.UpdateServers(ctx, *dir)
-	}}
+	app.Commands["emule"] = cli.Command{Summary: "Manage eMule servers", Run: func(ctx context.Context, args []string) error { return emuleCommand(ctx, *dir, args) }}
+	app.Commands["bt"] = cli.Command{Summary: "Manage BitTorrent trackers", Run: func(ctx context.Context, args []string) error { return btCommand(ctx, *dir, args) }}
 	return app.Run(ctx, args)
 }
 func daemonCommand(ctx context.Context, dir string, c *client.Client, args []string) error {
