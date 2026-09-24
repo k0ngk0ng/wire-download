@@ -1,11 +1,13 @@
-# wirectl download 0.2.3
+# wirectl download 0.2.7
 
-修复 aMule 中文文件名和百分号编码链接导致下载任务误报 `unknown` 的问题，并加入 Homebrew 安装说明。
+修复实时下载界面中左方向键可能绕过确认、误删任务和未完成 eMule 分片的严重问题。建议使用旧版的用户先退出 `watch`，升级后再重新打开。
 
-- 使用 UTF-8 环境读取 aMule 队列，保留包含中文文件名的状态行。
-- 正确提取编码文件链接的 eD2k hash；旧任务在引擎报告匹配 hash 时自动恢复，无需重复添加。
-- Homebrew 安装：`brew install k0ngk0ng/tap/wire-download`，自动安装共享的 `wirectl` 和配套下载引擎。
-- 支持 Homebrew 标准目录中的独立 Bash/Zsh/Fish 补全，以及 `brew services` 后台运行。
+- 完整解析方向键的终端转义序列，不再把序列末尾的 `D` 当作删除命令。
+- 删除必须先按 `d`，再按 `y`；取消、其他按键及单独的大写 `D` 均不能执行删除。
+- 删除确认绑定提示时的任务 ID，任务列表变化时不会误删另一项。
+- 增加按键回归测试和真实终端测试，覆盖连续左键、Ctrl-left、SS3 方向键及 Ctrl-D。
+
+已被旧版删除的 eMule 分片无法通过本次更新恢复；有备份时可从备份恢复。
 
 提供 macOS arm64、Linux arm64 和 Linux amd64 安装包；当前不提供 macOS Intel（amd64）安装包。每个包包含 wirectl、下载插件及 aria2/aMule 引擎，无需额外安装下载或搜索依赖。macOS 要求 13+，Linux 要求 glibc 2.36+。可选浏览器登录需要桌面端已有 Chromium 浏览器；远端传入会话需要 SSH 客户端。
 

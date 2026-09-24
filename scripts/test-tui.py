@@ -116,6 +116,12 @@ try:
     wait(lambda: jobs()[0]['status'] == 'paused')
     os.write(master, b'r')
     wait(lambda: jobs()[0]['status'] == 'active')
+    # Terminal escape sequences and control keys must never bypass confirmation.
+    for keys in (b'\x1b[D\x1b[D', b'\x1b[1;5D', b'\x1bOD', b'DD', b'\x04\x04',
+                 b'd\x1b[Dy', b'd\x1b[1;5Dy', b'd\x1bODy', b'dDy'):
+        os.write(master, keys)
+        time.sleep(.2)
+        assert jobs()[0]['status'] != 'removed', f'Unsafe removal for {keys!r}'
     os.write(master, b'd')
     wait(lambda: b'y confirms' in b''.join(chunks))
     os.write(master, b'n')
@@ -135,6 +141,7 @@ try:
     assert all(value == 'ok' for value in json.loads(cli('list', '--json'))['engines'].values())
     (work / 'result.json').write_text(json.dumps({'passed': True, 'checks': [
         'automatic dashboard and live progress', 'keyboard pause and resume',
+        'left arrows, Ctrl-left, SS3, Ctrl-D and uppercase D cannot delete',
         'removal requires confirmation', 'TTY and cursor restored',
         'daemon remains healthy after quitting dashboard']}, indent=2) + '\n')
     print('PASS real terminal progress, keyboard controls, confirmation, cleanup, and independent daemon')

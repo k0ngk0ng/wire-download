@@ -75,3 +75,37 @@ func TestSearchTableContainsProgressAndStableIDs(t *testing.T) {
 		t.Fatal("search table emitted an escape sequence")
 	}
 }
+
+func TestWatchRemovalRequiresExplicitConfirmation(t *testing.T) {
+	for _, input := range []string{"\x1b[D\x1b[D", "\x1b[1;5D", "\x1bOD", "DD", "\x03\x03", "\x04\x04", "yy", "d\x1b[Dy", "dny", "d\x1b[100;100dy"} {
+		var keys watchKeyDecoder
+		var confirmation removalConfirmation
+		for _, b := range []byte(input) {
+			key, ready := keys.feed(b)
+			if !ready {
+				continue
+			}
+			if id, _, _ := confirmation.handle(key, "task", false); id != "" {
+				t.Fatalf("input %q removed %s", input, id)
+			}
+		}
+	}
+	var c removalConfirmation
+	if id, _, prompt := c.handle('d', "one", false); id != "" || !prompt {
+		t.Fatal("missing prompt")
+	}
+	if id, _, _ := c.handle('y', "two", false); id != "" {
+		t.Fatal("removed different task")
+	}
+	c.handle('d', "one", false)
+	if id, _, _ := c.handle('y', "one", false); id != "one" {
+		t.Fatal("confirmation did not remove target")
+	}
+	if id, _, _ := c.handle('y', "one", false); id != "" {
+		t.Fatal("confirmation reused")
+	}
+	c.handle('d', "one", false)
+	if id, _, _ := c.handle('y', "one", true); id != "" {
+		t.Fatal("removed while pending")
+	}
+}

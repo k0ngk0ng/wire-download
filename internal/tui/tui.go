@@ -101,12 +101,17 @@ func Watch(ctx context.Context, c *client.Client) error {
 	keys := make(chan byte, 32)
 	go func() {
 		b := make([]byte, 1)
+		var decoder watchKeyDecoder
 		for {
 			if _, err := os.Stdin.Read(b); err != nil {
 				return
 			}
+			key, ready := decoder.feed(b[0])
+			if !ready {
+				continue
+			}
 			select {
-			case keys <- b[0]:
+			case keys <- key:
 			case <-ctx.Done():
 				return
 			}
@@ -139,7 +144,7 @@ func Watch(ctx context.Context, c *client.Client) error {
 	var status client.Status
 	selected := 0
 	message := ""
-	confirm := false
+	var removal removalConfirmation
 	pending := false
 	actions := make(chan error, 1)
 	render := func() {
@@ -223,36 +228,93 @@ func Watch(ctx context.Context, c *client.Client) error {
 				return nil
 			}
 			jobs := visible(status.Jobs)
-			if confirm {
-				confirm = false
-				if key != 'y' {
-					message = "Cancelled"
-					render()
-					continue
-				}
-				key = 'D'
+			selected = max(0, min(selected, len(jobs)-1))
+			selectedID := ""
+			if len(jobs) > 0 {
+				selectedID = jobs[selected].ID
 			}
-			switch key {
-			case 'j', 'B':
-				selected++
-			case 'k', 'A':
-				selected--
-			case 'd':
-				if len(jobs) > 0 && !pending {
-					confirm = true
-					message = "Remove task and unfinished eD2k data? y confirms."
+			id, consumed, prompted := removal.handle(key, selectedID, pending)
+			if consumed {
+				message = "Cancelled"
+				if prompted {
+					message = "Remove task " + selectedID + " and unfinished eD2k data? y confirms; any other key cancels."
 				}
-			case 'p', 'r', 'D':
-				if len(jobs) > 0 && !pending {
-					selected = max(0, min(selected, len(jobs)-1))
-					action := map[byte]string{'p': "pause", 'r': "resume", 'D': "remove"}[key]
-					id := jobs[selected].ID
+				if id != "" {
 					pending = true
 					message = "Working…"
-					go func() { actions <- c.Action(ctx, id, action) }()
+					go func() { actions <- c.Action(ctx, id, "remove") }()
+				}
+			} else {
+				switch key {
+				case 'j', 'B':
+					selected++
+				case 'k', 'A':
+					selected--
+				case 'p', 'r':
+					if selectedID != "" && !pending {
+						action := map[byte]string{'p': "pause", 'r': "resume"}[key]
+						id := selectedID
+						pending = true
+						message = "Working…"
+						go func() { actions <- c.Action(ctx, id, action) }()
+					}
 				}
 			}
 			render()
 		}
 	}
+}
+
+// removalConfirmation keeps destructive actions separate from raw key values.
+// Confirmation applies only to the task displayed when the prompt was opened.
+type removalConfirmation struct{ taskID string }
+
+func (r *removalConfirmation) handle(key byte, selectedID string, pending bool) (id string, consumed, prompted bool) {
+	if r.taskID != "" {
+		target := r.taskID
+		r.taskID = ""
+		if key == 'y' && !pending && target == selectedID {
+			return target, true, false
+		}
+		return "", true, false
+	}
+	if key == 'd' && !pending && selectedID != "" {
+		r.taskID = selectedID
+		return "", true, true
+	}
+	return "", false, false
+}
+
+// Consume complete CSI/SS3 key sequences so their bytes cannot act as commands.
+type watchKeyDecoder struct{ state byte }
+
+func (d *watchKeyDecoder) feed(b byte) (byte, bool) {
+	if b == 3 {
+		d.state = 0
+		return b, true
+	}
+	if b == 27 {
+		d.state = 1
+		return 0, true
+	} // Escape also cancels confirmation.
+	switch d.state {
+	case 1:
+		d.state = 0
+		if b == '[' || b == 'O' {
+			d.state = 2
+		}
+		return 0, false
+	case 2:
+		if b >= 0x40 && b <= 0x7e {
+			d.state = 0
+			switch b {
+			case 'A':
+				return 'k', true
+			case 'B':
+				return 'j', true
+			}
+		}
+		return 0, false
+	}
+	return b, true
 }
