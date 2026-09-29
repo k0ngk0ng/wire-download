@@ -4,7 +4,7 @@ set -eu
 install_source=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 install_prefix=${1:-"$HOME/.local"}
 case "$install_prefix" in /*) ;; *) echo "Installation prefix must be absolute" >&2; exit 1;; esac
-for install_binary in bin/wirectl bin/wirectl-download libexec/wirectl-download/bin/aria2c libexec/wirectl-download/bin/amuled libexec/wirectl-download/bin/amulecmd; do
+for install_binary in bin/wirectl bin/wirectl-download libexec/wirectl-download/bin/aria2c libexec/wirectl-download/bin/amuled libexec/wirectl-download/bin/amulecmd libexec/wirectl-download/bin/yt-dlp libexec/wirectl-download/bin/ffmpeg libexec/wirectl-download/bin/ffprobe libexec/wirectl-download/bin/deno; do
   test -x "$install_source/$install_binary" || { echo "Incomplete release: $install_binary is missing" >&2; exit 1; }
 done
 mkdir -p "$install_prefix/bin" "$install_prefix/libexec" "$install_prefix/share/wirectl-download"

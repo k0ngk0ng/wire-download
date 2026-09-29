@@ -80,7 +80,7 @@ func Table(w io.Writer, status client.Status) {
 	for _, j := range visible(status.Jobs) {
 		fmt.Fprintf(w, "%s  %-6s  %-10s  %6.1f%%  %10s  %s\n", j.ID, j.Engine, j.Status, j.Progress, Bytes(j.DownloadRate), Clean(j.Name))
 	}
-	for _, name := range []string{"aria2", "amule"} {
+	for _, name := range []string{"aria2", "amule", "yt-dlp"} {
 		fmt.Fprintf(w, "%s: %s\n", name, Clean(status.Engines[name]))
 	}
 }
@@ -162,7 +162,7 @@ func Watch(ctx context.Context, c *client.Client) error {
 		out.WriteString("\x1b[1;36m")
 		line("WIRE DOWNLOAD   •   local daemon / live transfers")
 		out.WriteString("\x1b[0m")
-		line(fmt.Sprintf("aria2: %s  |  aMule: %s  |  %d tasks", status.Engines["aria2"], status.Engines["amule"], len(jobs)))
+		line(fmt.Sprintf("aria2: %s  |  aMule: %s  |  video: %s  |  %d tasks", status.Engines["aria2"], status.Engines["amule"], status.Engines["yt-dlp"], len(jobs)))
 		line("")
 		nameWidth := min(28, max(10, width-49))
 		line("  " + cell("NAME", nameWidth) + " " + cell("STATE", 10) + " " + cell("PROGRESS", 20) + " DOWN/s")

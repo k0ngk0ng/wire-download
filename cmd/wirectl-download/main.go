@@ -81,18 +81,23 @@ func run(ctx context.Context, args []string) error {
 					return err
 				}
 			}
-			j, err := c.Add(ctx, source)
+			result, err := c.Submit(ctx, source)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("%s  %s  %s\n", j.ID, j.Engine, tui.Clean(j.Name))
+			for _, j := range result.Jobs {
+				fmt.Printf("%s  %s  %s\n", j.ID, j.Engine, tui.Clean(j.Name))
+			}
+			if len(result.Errors) > 0 {
+				return errors.New(strings.Join(result.Errors, "; "))
+			}
 		}
 		if !*detach && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 			return tui.Watch(ctx, c)
 		}
 		return nil
 	}
-	app := cli.App{Name: "wirectl download", Description: "HTTP(S) / ed2k / BitTorrent / magnet downloads; pass a URL or torrent file directly\nGlobal option: --data-dir <path> (before the subcommand), or WIRECTL_DOWNLOAD_HOME", Default: download, Commands: map[string]cli.Command{}}
+	app := cli.App{Name: "wirectl download", Description: "HTTP(S) / ed2k / BitTorrent / magnet / X / YouTube downloads; pass a URL or torrent file directly\nGlobal option: --data-dir <path> (before the subcommand), or WIRECTL_DOWNLOAD_HOME", Default: download, Commands: map[string]cli.Command{}}
 	app.Commands["completion"] = cli.Command{Summary: "Generate shell completion: bash | zsh | fish", Run: func(_ context.Context, args []string) error { return completionCommand(args) }}
 	app.Commands["search"] = cli.Command{Summary: "Search eMule, torrent and magnet indexes with live results", Run: func(ctx context.Context, args []string) error { return searchCommand(ctx, c, args) }}
 	app.Commands["bt"] = cli.Command{Summary: "Manage BitTorrent trackers", Run: func(ctx context.Context, args []string) error { return btCommand(ctx, *dir, args) }}
@@ -164,7 +169,7 @@ func run(ctx context.Context, args []string) error {
 			return err
 		}
 		failed := false
-		for _, b := range []string{cfg.Aria2Binary, cfg.AMuledBinary, cfg.AMulecmdBinary} {
+		for _, b := range []string{cfg.Aria2Binary, cfg.AMuledBinary, cfg.AMulecmdBinary, cfg.YTDLPBinary, cfg.FFmpegBinary, cfg.DenoBinary} {
 			p, err := exec.LookPath(b)
 			if err != nil {
 				fmt.Println("MISSING", b)
@@ -176,7 +181,7 @@ func run(ctx context.Context, args []string) error {
 		fmt.Println("State:", *dir)
 		fmt.Println("Downloads:", cfg.Downloads)
 		if failed {
-			return errors.New("install aria2 and aMule (including amuled/amulecmd); see README")
+			return errors.New("install the complete engine bundle (aria2, aMule, yt-dlp, ffmpeg, deno); see README")
 		}
 		return nil
 	}}

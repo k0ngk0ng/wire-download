@@ -1,7 +1,7 @@
 # wire-download
 
 `wire-download` 是项目和发行包名称；用户命令是 `wirectl download`，对应的插件
-可直接运行 `wirectl-download`。它支持 HTTP/HTTPS、ed2k、BitTorrent 和 magnet。
+可直接运行 `wirectl-download`。它支持 HTTP/HTTPS、ed2k、BitTorrent、magnet，以及 Twitter/X 和 YouTube 视频。
 CLI 通过私有 Unix socket 控制独立 daemon；关闭终端或退出仪表盘不会中断下载。
 
 CLI 入口与库位于 [`wirectl`](https://github.com/k0ngk0ng/wirectl) 仓库，该仓库需要相应访问权限。这里提供
@@ -19,7 +19,7 @@ wirectl download init
 wirectl download daemon start
 ```
 
-Formula 自动安装 `wirectl` 主程序，并附带 aria2/aMule 引擎；可以与
+Formula 自动安装 `wirectl` 主程序，并附带 aria2/aMule 和网站视频引擎；可以与
 `wire-connect` 一起安装。macOS 要求 13+，Linux 要求 glibc 2.36+。
 首次安装后运行 `init`；已有配置时跳过，继续使用原状态目录。
 
@@ -51,7 +51,7 @@ Bash、Zsh 和 Fish 的 `wirectl-download` 补全安装到 Homebrew 的标准目
 ### 手动安装发行包
 
 每个发行归档都是一个自包含的 macOS 或 Linux 目标包，包含主入口、下载插件、aria2
-和无 GUI 的 aMule 引擎；不需要另装引擎。安装脚本不访问网络，也不调用系统包管理器。
+和无 GUI 的 aMule 引擎，以及 yt-dlp、ffmpeg/ffprobe、Deno；不需要另装引擎或 Python。安装脚本不访问网络，也不调用系统包管理器。
 发布工作流分别构建 `darwin-arm64`、`linux-arm64` 和 `linux-amd64`，选择与你的系统和
 CPU 匹配的归档即可。当前不提供 macOS Intel（amd64）归档。它们是按目标分别打包的
 原生归档，不是一个跨架构文件。macOS 原生引擎的最低构建目标为 macOS 13；Linux
@@ -122,6 +122,45 @@ wirectl download completion fish | source
 
 持久启用时，把对应加载命令放入 `~/.bashrc`、`~/.zshrc` 或
 `~/.config/fish/config.fish`；Zsh 已初始化 `compinit` 时无需重复添加初始化命令。
+
+## Twitter/X 和 YouTube 视频
+
+直接提交网站链接，程序会提取视频并在后台下载：
+
+```sh
+wirectl download 'https://x.com/user/status/123456789'
+wirectl download 'https://www.youtube.com/watch?v=jNQXAC9IVRw'
+wirectl download 'https://www.youtube.com/shorts/VIDEO_ID'
+wirectl download add --detach 'https://twitter.com/user/status/123456789'
+```
+
+X 推文中的每个视频分别建立一个任务，各自支持暂停、恢复、删除和错误重试。
+链接带 `/video/1` 时仍解析整条推文；Twitter/X 域名、分享参数和清晰度不会造成重复任务。
+yt-dlp 返回的推文视频（包括可解析的引用视频）按媒体 ID 去重。图片不下载。
+YouTube 支持单视频、Shorts 和 youtu.be 短链接；带播放列表参数的视频链接只下载该视频。
+不自动展开频道或播放列表，暂不支持正在直播或尚未开始的内容。
+
+默认选择最佳可用画质。独立音视频轨道会由 ffmpeg 无损合并为 MKV；已有单文件视频
+保留来源容器（通常为 MP4）。不会将网页、封面或 m3u8 清单当作已下载的视频。
+文件名包含网站、推文/视频 ID 和媒体 ID，避免标题冲突。`list --json` 的 `video` 字段
+保留原始链接、媒体 ID、排列顺序和标题，不保存临时签名地址。
+
+网站解析期间提交命令可能等待最多三分钟；其他任务仍可正常查看和控制。
+任务状态包含 `resolving`（解析）、`active`（下载）和 `processing`（合并）；分轨下载的
+进度表示当前轨道，文件合并成功后才显示完成。退出仪表盘不影响后台下载。
+暂停会终止当前视频进程并保留分片，恢复或 daemon 重启会重新解析地址并续传；
+合并中暂停可能需要重新合并。错误任务使用 `resume <id>` 重试，完成文件在删除任务后保留。
+视频任务删除后也保留已有分片，重新提交可复用。
+
+需要登录时使用 `wirectl download login https://x.com` 或
+`wirectl download login https://www.youtube.com`。会话只传给对应网站的解析器，
+临时 Cookie 文件权限为 0600、每次进程结束后删除；Cookie 不进入任务数据库或命令参数。
+网站的登录、地区限制和限流仍然有效；解析失败会报告错误，不会退回下载网页。
+
+发行包固定包含 yt-dlp 2026.08.19、FFmpeg 9.0.2 和 Deno 2.9.7。网站改版后可能需要
+升级发行包。开发时可通过配置 `yt_dlp_binary`、`ffmpeg_binary`、`deno_binary` 指定工具路径，
+默认优先使用随包版本。`doctor` 检查这些工具是否安装。
+`max_downloads` 同时限制视频引擎自己的并发数；`download_limit` 对视频按每个任务生效。
 
 ## 搜索与选择下载
 
@@ -353,6 +392,8 @@ ED2K 实际传输使用 `scripts/test-ed2k.py`；Release 工作流在三个目�
 aria2（GPL-2.0-or-later）、aMule（GPL-2.0-or-later）、wxWidgets（wxWindows Library
 Licence）、Crypto++ 和 Boost（Boost Software License）作为独立引擎和静态构建依赖。
 Go CLI 使用 `golang.org/x/term`、`golang.org/x/sys`、`golang.org/x/net`（BSD-3-Clause）和 `gorilla/websocket`（BSD-2-Clause）。
+网站视频由 yt-dlp（Unlicense；独立发行二进制另含第三方组件）、FFmpeg（本项目构建为 LGPL-2.1-or-later）和 Deno（MIT，另含第三方组件）处理。
+
 打包时附带各组件许可证和对应源码/构建说明；不要省略 GPL/LGPL 对源码分发的要求。
 
 ## GitHub Release

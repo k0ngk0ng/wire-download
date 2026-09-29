@@ -18,15 +18,17 @@ import (
 	"time"
 
 	"github.com/k0ngk0ng/wire-download/internal/engine"
+	"github.com/k0ngk0ng/wire-download/internal/video"
 )
 
 type Job struct {
-	ID         string    `json:"id"`
-	Engine     string    `json:"engine"`
-	Source     string    `json:"source"`
-	Created    time.Time `json:"created"`
-	Updated    time.Time `json:"updated"`
-	MetadataID string    `json:"metadata_id,omitempty"`
+	Video      *video.Spec `json:"video,omitempty"`
+	ID         string      `json:"id"`
+	Engine     string      `json:"engine"`
+	Source     string      `json:"source"`
+	Created    time.Time   `json:"created"`
+	Updated    time.Time   `json:"updated"`
+	MetadataID string      `json:"metadata_id,omitempty"`
 	engine.Item
 }
 
@@ -65,6 +67,15 @@ func NewStore(dir string, backends map[string]engine.Backend) (*Store, error) {
 		}
 		if s.state.Version != 1 {
 			return nil, errors.New("unsupported job database version")
+		}
+	}
+	if backend, ok := backends["yt-dlp"].(*video.Backend); ok {
+		for _, j := range s.state.Jobs {
+			if j.Engine == "yt-dlp" && j.Video != nil && j.Status != "removed" {
+				if err := backend.Restore(j.Item.ID, *j.Video, j.Item); err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 	return s, nil
@@ -135,6 +146,12 @@ func ValidateSource(source string) (string, error) {
 }
 func (s *Store) save() error { return writeJSON(s.path, s.state) }
 func (s *Store) Add(ctx context.Context, source string) (Job, error) {
+	if _, _, _, handled, err := video.Source(source); handled {
+		if err != nil {
+			return Job{}, err
+		}
+		return Job{}, errors.New("website videos require the batch submission API; update the CLI")
+	}
 	kind, err := ValidateSource(source)
 	if err != nil {
 		return Job{}, err
@@ -333,6 +350,9 @@ func (s *Store) Action(ctx context.Context, id, action string) error {
 	}
 	j := &s.state.Jobs[idx]
 	b := s.backends[j.Engine]
+	if b == nil {
+		return errors.New("task engine is unavailable")
+	}
 	var err error
 	switch action {
 	case "pause":
@@ -340,7 +360,7 @@ func (s *Store) Action(ctx context.Context, id, action string) error {
 	case "resume":
 		err = b.Resume(ctx, j.Item.ID)
 	case "remove":
-		if j.Status != "complete" && j.Status != "error" && j.Status != "removed" {
+		if j.Engine == "yt-dlp" || (j.Status != "complete" && j.Status != "error" && j.Status != "removed") {
 			err = b.Remove(ctx, j.Item.ID)
 		}
 	default:

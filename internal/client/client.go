@@ -72,3 +72,12 @@ func (c *Client) Add(ctx context.Context, source string) (daemon.Job, error) {
 func (c *Client) Action(ctx context.Context, id, action string) error {
 	return c.Call(ctx, "POST", "/v1/jobs/"+id+"/"+action, nil, nil)
 }
+
+func (c *Client) Submit(ctx context.Context, source string) (daemon.Submission, error) {
+	var result daemon.Submission
+	httpClient := *c.http
+	httpClient.Timeout = 4 * time.Minute
+	extended := &Client{http: &httpClient}
+	err := extended.Call(ctx, "POST", "/v1/submissions", map[string]string{"source": source}, &result)
+	return result, err
+}

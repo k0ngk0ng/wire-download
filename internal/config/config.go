@@ -16,6 +16,9 @@ import (
 )
 
 type Config struct {
+	YTDLPBinary    string   `json:"yt_dlp_binary,omitempty"`
+	FFmpegBinary   string   `json:"ffmpeg_binary,omitempty"`
+	DenoBinary     string   `json:"deno_binary,omitempty"`
 	Version        int      `json:"version"`
 	Downloads      string   `json:"downloads"`
 	Aria2Binary    string   `json:"aria2_binary"`
@@ -84,6 +87,18 @@ func Load(dir string) (Config, error) {
 	if c.AuthProxyPort == 0 {
 		c.AuthProxyPort = 16802
 	}
+	if c.YTDLPBinary == "" {
+		c.YTDLPBinary = "yt-dlp"
+	}
+	if c.FFmpegBinary == "" {
+		c.FFmpegBinary = "ffmpeg"
+	}
+	if c.DenoBinary == "" {
+		c.DenoBinary = "deno"
+	}
+	c.YTDLPBinary = ResolveBinary(c.YTDLPBinary)
+	c.FFmpegBinary = ResolveBinary(c.FFmpegBinary)
+	c.DenoBinary = ResolveBinary(c.DenoBinary)
 	c.Aria2Binary = ResolveBinary(c.Aria2Binary)
 	c.AMuledBinary = ResolveBinary(c.AMuledBinary)
 	c.AMulecmdBinary = ResolveBinary(c.AMulecmdBinary)

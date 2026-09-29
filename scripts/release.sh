@@ -23,6 +23,11 @@ mkdir -p "$release_dir/bin" "$release_dir/deploy" "$release_dir/licenses"
 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.version=$release_version" -o "$release_dir/bin/wirectl-download" ./cmd/wirectl-download
 go build -buildvcs=false -trimpath -ldflags="-s -w -X main.version=$release_version" -o "$release_dir/bin/wirectl" ./cmd/wirectl
 python3 scripts/bundle-engines.py "$release_dir/libexec/wirectl-download"
+python3 scripts/bundle-video.py "$release_dir/libexec/wirectl-download"
+CGO_ENABLED=1 WIRECTL_TEST_YTDLP="$release_dir/libexec/wirectl-download/bin/yt-dlp" \
+  WIRECTL_TEST_FFMPEG="$release_dir/libexec/wirectl-download/bin/ffmpeg" \
+  WIRECTL_TEST_DENO="$release_dir/libexec/wirectl-download/bin/deno" \
+  go test -race -count=1 -run TestRealVideoMerge ./internal/video
 cp README.md "$release_dir/README.md"
 cp scripts/install.sh "$release_dir/install.sh"
 cp deploy/* "$release_dir/deploy/"
@@ -40,6 +45,7 @@ cp .cache/amule-build/src/boost_1_74_0/LICENSE_1_0.txt "$release_dir/licenses/bo
 release_sources="$release_root/dist/wire-download-$release_version-sources"
 mkdir -p "$release_sources/upstream" "$release_sources/wire-download" "$release_sources/wirectl"
 cp .cache/amule-build/downloads/amule_2.3.3.orig.tar.xz .cache/amule-build/downloads/wxWidgets-3.0.5.1.tar.bz2 .cache/amule-build/downloads/cryptopp-8.9.0.tar.gz .cache/amule-build/downloads/boost_1_74_0.tar.bz2 .cache/engines/aria2-1.37.0.tar.xz "$release_sources/upstream/"
+cp .cache/video/ffmpeg-9.0.2.tar.xz .cache/video/yt-dlp-2026.08.19.tar.gz "$release_sources/upstream/"
 if test "$release_os" = linux; then
   python3 scripts/bundle-runtime-sources.py "$release_dir/libexec/wirectl-download/runtime-libraries.json" "$release_sources/upstream/debian"
 fi

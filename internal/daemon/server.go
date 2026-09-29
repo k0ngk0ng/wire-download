@@ -17,6 +17,7 @@ import (
 
 	"github.com/k0ngk0ng/wire-download/internal/config"
 	"github.com/k0ngk0ng/wire-download/internal/engine"
+	"github.com/k0ngk0ng/wire-download/internal/video"
 )
 
 func acquire(dir string) (*os.File, error) {
@@ -104,6 +105,8 @@ func Run(ctx context.Context, dir string, c config.Config) error {
 	}
 	ab := engine.NewAria2(c.Aria2Port, c.Secret)
 	eb := engine.NewAMule(c.AMulecmdBinary, filepath.Join(dir, "amule"), c.Secret, c.AMulePort)
+	vb := video.New(video.Options{Binary: c.YTDLPBinary, FFmpeg: c.FFmpegBinary, Deno: c.DenoBinary, StateDir: dir, Downloads: c.Downloads, Max: c.MaxDownloads, Limit: c.DownloadLimit})
+	defer vb.Close()
 	var aria, amule *process
 	var closeProxy func()
 	// Keep cleanup available as soon as the backends are created. The backend
@@ -122,7 +125,7 @@ func Run(ctx context.Context, dir string, c config.Config) error {
 			closeProxy()
 		}
 	}()
-	store, err := NewStore(dir, map[string]engine.Backend{"aria2": ab, "amule": eb})
+	store, err := NewStore(dir, map[string]engine.Backend{"aria2": ab, "amule": eb, "yt-dlp": vb})
 	if err != nil {
 		return err
 	}
@@ -178,7 +181,7 @@ func Run(ctx context.Context, dir string, c config.Config) error {
 		return err
 	}
 	defer searches.manager.Close()
-	srv := &http.Server{Handler: Handler(store, stop, searches), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second}
+	srv := &http.Server{Handler: Handler(store, stop, searches), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 4 * time.Minute, IdleTimeout: 60 * time.Second}
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
 	log.Printf("wirectl ready: %s", socket)
@@ -244,6 +247,24 @@ func Handler(store *Store, stop context.CancelFunc, searches ...*SearchService) 
 	mux.HandleFunc("GET /v1/status", func(w http.ResponseWriter, r *http.Request) {
 		jobs, health := store.Snapshot()
 		respond(w, 200, map[string]any{"version": "1", "jobs": jobs, "engines": health})
+	})
+	mux.HandleFunc("POST /v1/submissions", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Source string `json:"source"`
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 128<<10)
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			fail(w, 400, err)
+			return
+		}
+		result, err := store.Submit(r.Context(), req.Source)
+		if err != nil {
+			fail(w, 422, err)
+			return
+		}
+		respond(w, 201, result)
 	})
 	mux.HandleFunc("POST /v1/jobs", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {

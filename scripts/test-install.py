@@ -111,7 +111,7 @@ try:
     for sock in reserved:
         sock.close()
     doctor = cli('doctor')
-    assert doctor.count(str(prefix / 'libexec/wirectl-download/bin')) == 3, doctor
+    assert doctor.count(str(prefix / 'libexec/wirectl-download/bin')) == 6, doctor
     print('PASS installed engines resolved with minimal PATH', flush=True)
     cli('daemon', 'start')
     started = True
