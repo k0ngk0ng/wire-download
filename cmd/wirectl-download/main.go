@@ -162,7 +162,7 @@ func run(ctx context.Context, args []string) error {
 			return nil
 		}}
 	}
-	app.Commands["daemon"] = cli.Command{Summary: "run | start | stop | status", Run: func(ctx context.Context, args []string) error { return daemonCommand(ctx, *dir, c, args) }}
+	app.Commands["daemon"] = cli.Command{Summary: "run | start | stop | restart | status", Run: func(ctx context.Context, args []string) error { return daemonCommand(ctx, *dir, c, args) }}
 	app.Commands["doctor"] = cli.Command{Summary: "Check configuration and installed engines", Run: func(ctx context.Context, args []string) error {
 		cfg, err := config.Load(*dir)
 		if err != nil {
@@ -189,7 +189,7 @@ func run(ctx context.Context, args []string) error {
 }
 func daemonCommand(ctx context.Context, dir string, c *client.Client, args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: wirectl download daemon run|start|stop|status")
+		return errors.New("usage: wirectl download daemon run|start|stop|restart|status")
 	}
 	switch args[0] {
 	case "run":
@@ -204,6 +204,20 @@ func daemonCommand(ctx context.Context, dir string, c *client.Client, args []str
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(s)
+	case "restart":
+		// Validate before stopping a healthy daemon. Only a missing/refused
+		// socket means it is already stopped; other errors must remain visible.
+		if _, err := config.Load(dir); err != nil {
+			return err
+		}
+		if _, err := c.Status(ctx); err == nil {
+			if err := daemonCommand(ctx, dir, c, []string{"stop"}); err != nil {
+				return fmt.Errorf("daemon restart stopped before startup: %w", err)
+			}
+		} else if !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
+			return fmt.Errorf("cannot check daemon before restart: %w", err)
+		}
+		return daemonCommand(ctx, dir, c, []string{"start"})
 	case "stop":
 		if err := c.Call(ctx, "POST", "/v1/shutdown", nil, nil); err != nil {
 			return err
@@ -213,7 +227,11 @@ func daemonCommand(ctx context.Context, dir string, c *client.Client, args []str
 		tick := time.NewTicker(200 * time.Millisecond)
 		defer tick.Stop()
 		for {
-			if _, err := os.Stat(filepath.Join(dir, "daemon.pid")); os.IsNotExist(err) {
+			stopped, err := daemonStopped(dir)
+			if err != nil {
+				return err
+			}
+			if stopped {
 				fmt.Println("Daemon stopped")
 				return nil
 			}
@@ -282,4 +300,29 @@ func daemonCommand(ctx context.Context, dir string, c *client.Client, args []str
 	default:
 		return errors.New("unknown daemon command")
 	}
+}
+
+// The PID file is removed just before the lock is released. Wait for both so
+// restart cannot race the previous daemon's final cleanup.
+func daemonStopped(dir string) (bool, error) {
+	if _, err := os.Stat(filepath.Join(dir, "daemon.pid")); err == nil {
+		return false, nil
+	} else if !os.IsNotExist(err) {
+		return false, err
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "daemon.lock"), os.O_RDWR, 0)
+	if os.IsNotExist(err) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

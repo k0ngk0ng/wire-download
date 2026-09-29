@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,9 +13,25 @@ import (
 	"time"
 
 	"github.com/k0ngk0ng/wire-download/internal/daemon"
+	"github.com/k0ngk0ng/wire-download/internal/video"
 )
 
 type Client struct{ http *http.Client }
+
+type HTTPError struct {
+	StatusCode int
+	Method     string
+	Path       string
+	Message    string
+}
+
+func (e *HTTPError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return fmt.Sprintf("daemon API %s %s: HTTP %d %s", e.Method, e.Path, e.StatusCode, http.StatusText(e.StatusCode))
+}
+
 type Status struct {
 	Version string            `json:"version"`
 	Jobs    []daemon.Job      `json:"jobs"`
@@ -50,9 +67,9 @@ func (c *Client) Call(ctx context.Context, method, path string, body, result any
 			Error string `json:"error"`
 		}
 		if err = json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&e); err != nil {
-			return fmt.Errorf("daemon HTTP %d", res.StatusCode)
+			e.Error = ""
 		}
-		return fmt.Errorf("%s", e.Error)
+		return &HTTPError{StatusCode: res.StatusCode, Method: method, Path: path, Message: e.Error}
 	}
 	if result == nil {
 		return nil
@@ -74,10 +91,27 @@ func (c *Client) Action(ctx context.Context, id, action string) error {
 }
 
 func (c *Client) Submit(ctx context.Context, source string) (daemon.Submission, error) {
+	_, _, _, handled, err := video.Source(source)
+	if err != nil {
+		return daemon.Submission{}, err
+	}
+	// Keep ordinary downloads compatible with daemons predating video support.
+	// Never retry a video as an ordinary URL: that would download HTML.
+	if !handled {
+		job, err := c.Add(ctx, source)
+		if err != nil {
+			return daemon.Submission{}, err
+		}
+		return daemon.Submission{Jobs: []daemon.Job{job}}, nil
+	}
 	var result daemon.Submission
 	httpClient := *c.http
 	httpClient.Timeout = 4 * time.Minute
 	extended := &Client{http: &httpClient}
-	err := extended.Call(ctx, "POST", "/v1/submissions", map[string]string{"source": source}, &result)
+	err = extended.Call(ctx, "POST", "/v1/submissions", map[string]string{"source": source}, &result)
+	var response *HTTPError
+	if errors.As(err, &response) && (response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusMethodNotAllowed) {
+		return result, fmt.Errorf("running daemon does not support video submissions; upgrade wire-download and run 'wirectl download daemon restart' (use the same --data-dir if set): %w", err)
+	}
 	return result, err
 }

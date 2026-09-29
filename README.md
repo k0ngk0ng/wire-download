@@ -89,6 +89,7 @@ wirectl download pause <id>
 wirectl download resume <id>
 wirectl download remove <id>
 wirectl download daemon status
+wirectl download daemon restart
 wirectl download daemon stop
 wirectl download doctor
 ```
@@ -314,6 +315,13 @@ wirectl download daemon start
 控制端口无需映射到公网。默认不开启 UPnP。
 
 ## 后台运行与恢复
+
+`wirectl download daemon restart` 会等待旧 daemon 保存状态、退出并释放锁后再启动；
+未运行时直接启动，停止失败时返回错误。沿用原状态目录，保留任务和下载文件。
+通过 Homebrew/systemd 管理的服务请使用对应的服务管理器重启。
+
+普通 HTTP(S)、BT、磁力、电驴下载兼容旧 daemon；X/YouTube 视频需要新版 daemon。
+仅升级命令行程序不会替换正在运行的进程；视频接口不可用时会提示升级并重启。
 
 `daemon start` 脱离终端运行；`daemon run` 保持前台，供 systemd/launchd 管理。
 daemon 使用文件锁防止同一个状态目录运行多个实例。引擎退出时 daemon 报错退出，

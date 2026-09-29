@@ -127,6 +127,7 @@ func TestBashCompletionContexts(t *testing.T) {
 		at    int
 		want  string
 	}{
+		{name: "daemon restart", words: []string{"wirectl", "download", "daemon", "re"}, at: 3, want: "restart"},
 		{name: "standalone command", words: []string{"wirectl-download", "se"}, at: 1, want: "search"},
 		{name: "root dispatch", words: []string{"wirectl", "dow"}, at: 1, want: "download"},
 		{name: "data dir value is skipped", words: []string{"wirectl-download", "--data-dir", ".cache", "se"}, at: 3, want: "search"},

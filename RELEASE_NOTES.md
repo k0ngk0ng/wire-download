@@ -1,17 +1,14 @@
-# wirectl download 0.3.1
+# wirectl download 0.3.2
 
-新增 Twitter/X 和 YouTube 视频下载，直接把网站链接传给 `wirectl download`。
+修复升级客户端后、旧 daemon 仍在运行时，普通下载返回 `daemon HTTP 404` 的兼容性回归。
 
-- X 一条推文的每个视频各建一个任务，支持 Twitter/X 域名去重和独立暂停、恢复、删除。
-- YouTube 支持单视频、Shorts 和短链接；不自动展开播放列表或频道。
-- 默认下载最佳可用画质，分离的音视频轨道无损合并为 MKV；单文件视频保留原容器。
-- 视频任务在 daemon 中运行，关闭终端不影响下载；暂停保留分片，恢复和重启时重新解析地址。
-- 错误任务可以用 `resume` 重试。网站登录复用已有 `login` 会话，临时 Cookie 文件不会写进任务数据库。
-- 三个平台的发行包新增 yt-dlp 2026.08.19、FFmpeg/ffprobe 9.0.2、Deno 2.9.7，无需另外安装 Python 或视频工具。
+- HTTP(S)、torrent、magnet、ed2k 恢复使用兼容旧 daemon 的任务接口，原命令无需改变。
+- 只有 X/Twitter、YouTube 视频使用批量视频接口；旧 daemon 不支持时明确提示升级并执行 `wirectl download daemon restart`，不会把网页 HTML 当视频下载。
+- 新增 `daemon restart`：等待状态保存、旧进程清理并释放锁后再启动；未运行时启动，停止失败时保留错误并中止启动。
+- daemon API 错误保留接口路径和 HTTP 状态，服务端具体错误继续原样显示。
+- 更新 Bash/Zsh/Fish 补全和使用说明。
 
-提供 macOS arm64（macOS 13+）、Linux arm64 和 Linux amd64（glibc 2.36+）安装包。
-升级前停止 daemon，升级后重新启动；原下载状态和文件保留。
-网站可用性、登录、地区限制和限流可能影响下载；不支持直播、尚未开始的视频或自动展开播放列表。
+新增旧/新 daemon 接口兼容、视频多任务与部分失败、禁止 HTML 回退、错误保留及不重复提交的回归测试。
+安装验收直接执行 restart，检查进程更换、暂停/完成/删除状态、HTTP 登录和续传保持正确。
 
-发布验证包含任务拆分、去重、暂停恢复、Cookie 隔离，以及实际 yt-dlp HTTP 下载和 ffmpeg 音视频合并；
-保留 HTTP 登录、BT/eMule 真实协议、重启恢复和终端操作的现有验收。
+提供 macOS arm64、Linux arm64 和 Linux amd64 完整安装包，继续内置 aria2、aMule、yt-dlp、FFmpeg 和 Deno。

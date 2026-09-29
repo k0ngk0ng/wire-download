@@ -82,6 +82,22 @@ jobs:
         run: |
           python3 scripts/test-tui.py "$PWD/.test-data/install"
           python3 scripts/test-search-tui.py "$PWD/.test-data/install"
+      - name: Verify new CLI against a released legacy daemon
+        run: |
+          mkdir -p .test-data/legacy
+          BASE=https://github.com/k0ngk0ng/wire-download/releases/download/v0.2.7
+          ARCHIVE="wire-download-0.2.7-$TARGET.tar.gz"
+          curl --fail --location --retry 3 --max-time 180 "$BASE/SHA256SUMS" -o .test-data/legacy/SHA256SUMS
+          curl --fail --location --retry 3 --max-time 180 "$BASE/$ARCHIVE" -o ".test-data/legacy/$ARCHIVE"
+          python3 - <<'PY'
+          import hashlib, os, pathlib
+          root = pathlib.Path('.test-data/legacy')
+          name = 'wire-download-0.2.7-' + os.environ['TARGET'] + '.tar.gz'
+          checksums = {p[1].lstrip('./'): p[0] for line in (root / 'SHA256SUMS').read_text().splitlines() if (p := line.split())}
+          assert hashlib.sha256((root / name).read_bytes()).hexdigest() == checksums[name], 'Legacy archive checksum mismatch'
+          PY
+          tar -xzf ".test-data/legacy/$ARCHIVE" -C .test-data/legacy
+          python3 scripts/test-daemon-compat.py "$PWD/.test-data/install/bin/wirectl-download" "$PWD/.test-data/legacy/wire-download-0.2.7-$TARGET/bin/wirectl-download"
       - name: Verify BitTorrent pause and restart recovery
         run: |
           python3 scripts/test-bt-recovery.py "$PWD/.test-data/install" --only torrent --only http-torrent-auth

@@ -113,18 +113,18 @@ try:
     doctor = cli('doctor')
     assert doctor.count(str(prefix / 'libexec/wirectl-download/bin')) == 6, doctor
     print('PASS installed engines resolved with minimal PATH', flush=True)
-    cli('daemon', 'start')
+    cli('daemon', 'restart')
     started = True
+    print('PASS restart starts a stopped daemon', flush=True)
     assert (state / 'daemon.sock').stat().st_mode & 0o777 == 0o600
     cli('add', '--detach', f'http://127.0.0.1:{server.server_port}/fixture.bin')
     snapshot = wait_for(lambda js: js and 0 < js[0]['progress'] < 100)
     task_id = snapshot[0]['id']
     cli('pause', task_id)
     wait_for(lambda js: js[0]['status'] == 'paused')
-    cli('daemon', 'stop')
-    started = False
-    cli('daemon', 'start')
-    started = True
+    old_pid = (state / 'daemon.pid').read_text()
+    cli('daemon', 'restart')
+    assert (state / 'daemon.pid').read_text() != old_pid, 'Restart reused the old daemon'
     snapshot = wait_for(lambda js: js and js[0]['status'] == 'paused')
     assert snapshot[0]['id'] == task_id
     print('PASS pause and daemon restart preserve task identity/state', flush=True)
@@ -132,10 +132,9 @@ try:
     wait_for(lambda js: js[0]['status'] == 'complete')
     assert hashlib.sha256((downloads / 'fixture.bin').read_bytes()).digest() == hashlib.sha256(payload).digest()
     before_restart = len(requests)
-    cli('daemon', 'stop')
-    started = False
-    cli('daemon', 'start')
-    started = True
+    old_pid = (state / 'daemon.pid').read_text()
+    cli('daemon', 'restart')
+    assert (state / 'daemon.pid').read_text() != old_pid, 'Restart reused the old daemon'
     time.sleep(3)  # Include a full refresh after engine session recovery.
     snapshot = jobs()
     assert next(j for j in snapshot if j['id'] == task_id)['status'] == 'complete', snapshot
@@ -155,20 +154,18 @@ try:
     auth_jobs = wait_for(lambda js: any(j['name'] == 'private.bin' and 0 < j['progress'] < 100 for j in js))
     auth_id = next(j['id'] for j in auth_jobs if j['name'] == 'private.bin')
     cli('pause', auth_id)
-    cli('daemon', 'stop')
-    started = False
-    cli('daemon', 'start')
-    started = True
+    old_pid = (state / 'daemon.pid').read_text()
+    cli('daemon', 'restart')
+    assert (state / 'daemon.pid').read_text() != old_pid, 'Restart reused the old daemon'
     cli('resume', auth_id)
     wait_for(lambda js: any(j['id'] == auth_id and j['status'] == 'complete' for j in js))
     assert (downloads / 'private.bin').read_bytes() == payload
     assert 'owned-browser-session' not in (state / 'aria2/session.txt').read_text()
     assert 'owned-browser-session' not in (state / 'jobs.json').read_text()
     before_restart = len(requests)
-    cli('daemon', 'stop')
-    started = False
-    cli('daemon', 'start')
-    started = True
+    old_pid = (state / 'daemon.pid').read_text()
+    cli('daemon', 'restart')
+    assert (state / 'daemon.pid').read_text() != old_pid, 'Restart reused the old daemon'
     time.sleep(3)
     snapshot = jobs()
     assert next(j for j in snapshot if j['id'] == auth_id)['status'] == 'complete', snapshot

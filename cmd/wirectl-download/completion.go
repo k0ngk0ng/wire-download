@@ -264,7 +264,7 @@ _wirectl_download_completion() {
                 if [[ "$cur" == -* ]]; then
                     _wirectl_download_values "$cur" "--help -h"
                 else
-                    _wirectl_download_values "$cur" "run start stop status"
+                    _wirectl_download_values "$cur" "run start stop restart status"
                 fi
             fi
             return
@@ -502,7 +502,7 @@ _wirectl_download_completion() {
                 if [[ "$cur" == -* ]]; then
                     _wirectl_download_values "$cur" --help -h
                 else
-                    _wirectl_download_values "$cur" run start stop status
+                    _wirectl_download_values "$cur" run start stop restart status
                 fi
             fi
             return
@@ -692,7 +692,7 @@ function __wirectl_download_complete
                 if string match -q -- '-*' "$current"
                     __wirectl_download_values --help -h
                 else
-                    __wirectl_download_values run start stop status
+                    __wirectl_download_values run start stop restart status
                 end
             end
             return
