@@ -1,4 +1,4 @@
-# wirectl download 0.3.0
+# wirectl download 0.3.1
 
 新增 Twitter/X 和 YouTube 视频下载，直接把网站链接传给 `wirectl download`。
 

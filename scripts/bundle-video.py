@@ -64,7 +64,14 @@ source = fetch(f'https://ffmpeg.org/releases/ffmpeg-{ffmpeg_version}.tar.xz', f'
 src = cache / f'ffmpeg-{ffmpeg_version}'
 if not src.exists():
     with tarfile.open(source) as archive:
-        archive.extractall(cache, filter='data')
+        # Debian 12's Python 3.11.2 predates tarfile's filter argument.
+        # This pinned source archive needs only ordinary files/directories;
+        # validate every member before any extraction, including its root.
+        for member in archive.getmembers():
+            target_path = (cache / member.name).resolve()
+            if not target_path.is_relative_to(src) or not (member.isdir() or member.isfile()):
+                raise SystemExit(f'Unsafe FFmpeg archive member: {member.name}')
+        archive.extractall(cache)
 build = cache / ('ffmpeg-build-' + '-'.join(target))
 build.mkdir(exist_ok=True)
 if not (build / 'ffmpeg').exists():
